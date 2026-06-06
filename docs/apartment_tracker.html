@@ -1,0 +1,444 @@
+<!-- Apartment Hunt Tracker: enter listings, persist them, export to Excel -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  :root {
+    --paper: #faf5ee;
+    --paper-2: #f3ebe0;
+    --ink: #2a241d;
+    --ink-soft: #6b6157;
+    --line: #e2d6c6;
+    --terra: #c4583a;
+    --terra-soft: #f0d9d1;
+    --teal: #2f6d68;
+    --teal-soft: #d8e7e5;
+    --gold: #b8860b;
+    --shadow: 0 1px 2px rgba(42,36,29,.05), 0 8px 24px rgba(42,36,29,.06);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  #aptApp {
+    font-family: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 400px at 110% -10%, rgba(196,88,58,.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(47,109,104,.06), transparent 55%),
+      var(--paper);
+    min-height: 100vh;
+    padding: 28px clamp(14px, 4vw, 44px) 64px;
+    line-height: 1.5;
+  }
+
+  .hdr { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 18px; border-bottom: 1.5px solid var(--line); }
+  .title { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: clamp(28px, 4.5vw, 42px); letter-spacing: -.02em; margin: 0; line-height: 1.05; }
+  .title em { font-style: italic; color: var(--terra); }
+  .subtitle { color: var(--ink-soft); margin: 6px 0 0; font-size: 14.5px; max-width: 52ch; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px; box-shadow: var(--shadow); text-align: center; min-width: 78px; }
+  .stat b { display: block; font-family: 'Fraunces', serif; font-size: 22px; line-height: 1; }
+  .stat span { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 20px 0 16px; }
+  .toolbar .spacer { flex: 1; }
+  select, input, textarea {
+    font-family: inherit; font-size: 14px; color: var(--ink);
+    background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+    outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  select:focus, input:focus, textarea:focus { border-color: var(--terra); box-shadow: 0 0 0 3px var(--terra-soft); }
+  label { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; display: block; }
+
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: 10px; font-weight: 600; font-size: 14px; transition: transform .08s, filter .15s, background .15s; }
+  button:active { transform: translateY(1px); }
+  .btn-primary { background: var(--terra); color: #fff; padding: 10px 18px; box-shadow: var(--shadow); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); padding: 9px 14px; }
+  .btn-ghost:hover { background: var(--paper-2); }
+  .btn-teal { background: var(--teal); color: #fff; padding: 10px 18px; box-shadow: var(--shadow); }
+  .btn-teal:hover { filter: brightness(1.06); }
+
+  /* Form panel */
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px; margin-bottom: 22px; display: none; }
+  .panel.open { display: block; animation: slideIn .25s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .panel h3 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0 0 16px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  .field { display: flex; flex-direction: column; }
+  .field.full { grid-column: 1 / -1; }
+  textarea { resize: vertical; min-height: 64px; }
+  .hint { font-size: 11.5px; color: var(--ink-soft); margin-top: 4px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .form-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+  /* Table */
+  .table-wrap { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 13.5px; }
+  thead th { position: sticky; top: 0; background: var(--paper-2); text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); padding: 12px 12px; border-bottom: 1.5px solid var(--line); white-space: nowrap; }
+  tbody td { padding: 12px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--paper); }
+  .addr { font-weight: 600; max-width: 200px; }
+  .rent { font-family: 'Fraunces', serif; font-weight: 600; white-space: nowrap; }
+  .notes-cell { max-width: 240px; color: var(--ink-soft); font-size: 12.5px; }
+  .link-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--teal-soft); color: var(--teal); padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .link-chip:hover { filter: brightness(.96); }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .row-actions { display: flex; gap: 6px; }
+  .icon-btn { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; width: 30px; height: 30px; font-size: 14px; display: grid; place-items: center; }
+  .icon-btn:hover { background: var(--terra-soft); }
+  .stars { color: var(--gold); letter-spacing: 1px; white-space: nowrap; }
+  .muted { color: var(--ink-soft); }
+
+  .empty { padding: 54px 24px; text-align: center; color: var(--ink-soft); }
+  .empty h4 { font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); margin: 0 0 6px; }
+  .footnote { margin-top: 18px; font-size: 12.5px; color: var(--ink-soft); }
+</style>
+
+<div id="aptApp">
+  <div class="hdr">
+    <div>
+      <h1 class="title">Apartment <em>Hunt</em></h1>
+      <p class="subtitle">Track your NYC &amp; NJ visits, commutes, and contacts. Entries save automatically. Export to Excel anytime.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="stTotal">0</b><span>Listings</span></div>
+      <div class="stat"><b id="stVisits">0</b><span>Visits set</span></div>
+      <div class="stat"><b id="stInterested">0</b><span>Liked</span></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-primary" id="addBtn">+ Add listing</button>
+    <select id="fStatus"><option value="">All statuses</option></select>
+    <select id="fLoc"><option value="">All locations</option></select>
+    <select id="sortBy">
+      <option value="visit">Sort: Visit date</option>
+      <option value="rent">Sort: Rent (low→high)</option>
+      <option value="loc">Sort: Location</option>
+      <option value="added">Sort: Recently added</option>
+    </select>
+    <span class="spacer"></span>
+    <button class="btn-ghost" id="sampleBtn">Add example row</button>
+    <button class="btn-teal" id="exportBtn">⬇ Export to Excel</button>
+  </div>
+
+  <div class="panel" id="formPanel">
+    <h3 id="formTitle">Add a listing</h3>
+    <div class="grid">
+      <div class="field"><label>Status</label>
+        <select id="fld_status">
+          <option>To contact</option><option>Contacted</option><option>Visit scheduled</option>
+          <option>Visited</option><option>Interested</option><option>Passed</option>
+        </select>
+      </div>
+      <div class="field"><label>Location</label>
+        <input id="fld_location" list="locOptions" placeholder="e.g. Jersey City">
+        <datalist id="locOptions">
+          <option>Manhattan, NYC</option><option>Brooklyn, NYC</option><option>Queens, NYC</option>
+          <option>Bronx, NYC</option><option>Staten Island, NYC</option>
+          <option>Jersey City</option><option>Hoboken</option><option>Newark</option><option>Other NJ</option>
+        </datalist>
+      </div>
+      <div class="field"><label>Type / Beds</label>
+        <input id="fld_type" placeholder="e.g. 2BR apt, Studio flex 1, Townhouse">
+      </div>
+      <div class="field full"><label>Address</label>
+        <input id="fld_address" placeholder="e.g. 145 W 24th St, Apt 4B, New York, NY 10011">
+      </div>
+      <div class="field"><label>Rent ($/month)</label>
+        <input id="fld_rent" type="number" min="0" step="50" placeholder="2400">
+      </div>
+      <div class="field"><label>Visit date &amp; time</label>
+        <input id="fld_visit" type="datetime-local">
+      </div>
+      <div class="field full"><label>Door-to-door commute link (Google Maps, transit)</label>
+        <input id="fld_commute_url" type="url" placeholder="https://www.google.com/maps/dir/?api=1&...&travelmode=transit">
+        <span class="hint">Paste the Maps directions URL for apartment → office on public transit (pick your exact route, then copy the link).</span>
+      </div>
+      <div class="field"><label>Commute time / route</label>
+        <input id="fld_commute_time" placeholder="42 min · 1 train + 8 min walk">
+      </div>
+      <div class="field"><label>Contact name</label>
+        <input id="fld_contact_name" placeholder="e.g. Maria (broker)">
+      </div>
+      <div class="field"><label>Contact number</label>
+        <input id="fld_contact_number" placeholder="+1 ...">
+      </div>
+      <div class="field"><label>Contact method</label>
+        <select id="fld_contact_method">
+          <option>WhatsApp</option><option>iMessage</option><option>Call / Text</option>
+          <option>Facebook Marketplace</option><option>StreetEasy</option><option>Zillow</option>
+          <option>Apartments.com</option><option>Email</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Rating (after visit)</label>
+        <select id="fld_rating">
+          <option value="">—</option><option value="1">★</option><option value="2">★★</option>
+          <option value="3">★★★</option><option value="4">★★★★</option><option value="5">★★★★★</option>
+        </select>
+      </div>
+      <div class="field full"><label>Photos / videos (links)</label>
+        <input id="fld_photos" placeholder="Paste link(s), separated by commas — listing link, Google Photos, etc.">
+        <span class="hint">Excel can't hold actual images/videos cleanly, so paste links here (the listing URL, or a Google Photos/Drive share link of pics you take).</span>
+      </div>
+      <div class="field full"><label>Notes / remarks</label>
+        <textarea id="fld_notes" placeholder="What they said, what to ask, fee/move-in details, vibe, etc."></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" id="saveBtn">Save listing</button>
+      <button class="btn-ghost" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Status</th><th>Address</th><th>Type</th><th>Rent</th><th>Location</th>
+        <th>Visit</th><th>Commute (D2D)</th><th>Contact</th><th>Media</th><th>Rating</th><th>Notes</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="emptyState">
+      <h4>No listings yet</h4>
+      <div>Hit <b>+ Add listing</b> to enter your first one — or <b>Add example row</b> to see the format.</div>
+    </div>
+  </div>
+
+  <p class="footnote">Tip: for the commute link, open Google Maps directions, set mode to <b>Transit</b>, choose the exact route you'd take, then Share → Copy link and paste it in. The link reopens that exact route.</p>
+</div>
+
+<script>
+(function () {
+  var KEY = 'apt_listings_v1';
+  var listings = [];
+  var editingId = null;
+
+  // ---- storage (uses Claude's persistent artifact storage; falls back to memory) ----
+  var hasStore = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
+  async function load() {
+    if (!hasStore) return;
+    try {
+      var r = await window.storage.get(KEY);
+      if (r && r.value) listings = JSON.parse(r.value);
+    } catch (e) { listings = listings || []; }
+  }
+  async function save() {
+    if (!hasStore) return;
+    try { await window.storage.set(KEY, JSON.stringify(listings)); }
+    catch (e) { console.error('save failed', e); }
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var fields = ['status','location','type','address','rent','visit','commute_url','commute_time','contact_name','contact_number','contact_method','rating','photos','notes'];
+
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+
+  var statusColors = {
+    'To contact':   ['#f3ebe0','#6b6157'],
+    'Contacted':    ['#d8e7e5','#2f6d68'],
+    'Visit scheduled':['#fde9c8','#9a6b00'],
+    'Visited':      ['#e0e7f0','#3a5a82'],
+    'Interested':   ['#d6efd6','#2e7d32'],
+    'Passed':       ['#f0d9d1','#a8392020']
+  };
+
+  function fmtVisit(v) {
+    if (!v) return '<span class="muted">—</span>';
+    try {
+      var d = new Date(v);
+      if (isNaN(d)) return esc(v);
+      return d.toLocaleString(undefined, { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+    } catch (e) { return esc(v); }
+  }
+  function stars(r) { r = parseInt(r,10); if (!r) return '<span class="muted">—</span>'; return '<span class="stars">' + '★'.repeat(r) + '</span>'; }
+  function photoLinks(s) {
+    if (!s) return '<span class="muted">—</span>';
+    var arr = s.split(/[,\n]/).map(function(x){return x.trim();}).filter(Boolean);
+    if (!arr.length) return '<span class="muted">—</span>';
+    return arr.map(function(u, i){ var href = /^https?:\/\//.test(u) ? u : 'https://' + u; return '<a class="link-chip" target="_blank" rel="noopener" href="' + esc(href) + '">▸ ' + (arr.length>1?('#'+(i+1)):'View') + '</a>'; }).join(' ');
+  }
+
+  function refreshFilters() {
+    var fs = $('fStatus'), fl = $('fLoc');
+    var curS = fs.value, curL = fl.value;
+    var statuses = ['To contact','Contacted','Visit scheduled','Visited','Interested','Passed'];
+    fs.innerHTML = '<option value="">All statuses</option>' + statuses.map(function(s){return '<option>'+s+'</option>';}).join('');
+    var locs = Array.from(new Set(listings.map(function(l){return l.location;}).filter(Boolean))).sort();
+    fl.innerHTML = '<option value="">All locations</option>' + locs.map(function(s){return '<option>'+esc(s)+'</option>';}).join('');
+    fs.value = curS; fl.value = curL;
+  }
+
+  function visibleSorted() {
+    var fs = $('fStatus').value, fl = $('fLoc').value, sb = $('sortBy').value;
+    var rows = listings.filter(function(l){ return (!fs || l.status===fs) && (!fl || l.location===fl); });
+    rows.sort(function(a,b){
+      if (sb==='rent') return (parseFloat(a.rent)||1e12) - (parseFloat(b.rent)||1e12);
+      if (sb==='loc') return (a.location||'').localeCompare(b.location||'');
+      if (sb==='added') return (b._id||0) - (a._id||0);
+      // visit date (empty last)
+      var av = a.visit ? new Date(a.visit).getTime() : 8e15;
+      var bv = b.visit ? new Date(b.visit).getTime() : 8e15;
+      return av - bv;
+    });
+    return rows;
+  }
+
+  function render() {
+    var rows = visibleSorted();
+    var tb = $('tbody');
+    $('emptyState').style.display = listings.length ? 'none' : 'block';
+    tb.innerHTML = rows.map(function (l) {
+      var sc = statusColors[l.status] || ['#f3ebe0','#6b6157'];
+      var commute = l.commute_url
+        ? '<a class="link-chip" target="_blank" rel="noopener" href="'+esc(l.commute_url)+'">🚉 Route</a>'
+        : '<span class="muted">—</span>';
+      var cTime = l.commute_time ? '<div class="hint" style="margin-top:5px">'+esc(l.commute_time)+'</div>' : '';
+      var contact = (l.contact_name||l.contact_number||l.contact_method)
+        ? '<div>'+esc(l.contact_name||'')+'</div>'
+          + (l.contact_number?'<div class="muted">'+esc(l.contact_number)+'</div>':'')
+          + (l.contact_method?'<div class="hint" style="margin-top:3px">'+esc(l.contact_method)+'</div>':'')
+        : '<span class="muted">—</span>';
+      return '<tr>'
+        + '<td><span class="pill" style="background:'+sc[0]+';color:'+sc[1]+'">'+esc(l.status||'')+'</span></td>'
+        + '<td class="addr">'+esc(l.address||'')+'</td>'
+        + '<td>'+esc(l.type||'')+'</td>'
+        + '<td class="rent">'+(l.rent?('$'+Number(l.rent).toLocaleString()):'<span class="muted">—</span>')+'</td>'
+        + '<td>'+esc(l.location||'')+'</td>'
+        + '<td>'+fmtVisit(l.visit)+'</td>'
+        + '<td>'+commute+cTime+'</td>'
+        + '<td>'+contact+'</td>'
+        + '<td>'+photoLinks(l.photos)+'</td>'
+        + '<td>'+stars(l.rating)+'</td>'
+        + '<td class="notes-cell">'+esc(l.notes||'')+'</td>'
+        + '<td><div class="row-actions">'
+          + '<button class="icon-btn" title="Edit" data-edit="'+l._id+'">✎</button>'
+          + '<button class="icon-btn" title="Delete" data-del="'+l._id+'">🗑</button>'
+        + '</div></td>'
+        + '</tr>';
+    }).join('');
+
+    $('stTotal').textContent = listings.length;
+    $('stVisits').textContent = listings.filter(function(l){return l.status==='Visit scheduled' || l.visit;}).length;
+    $('stInterested').textContent = listings.filter(function(l){return l.status==='Interested';}).length;
+  }
+
+  function openForm(listing) {
+    editingId = listing ? listing._id : null;
+    $('formTitle').textContent = listing ? 'Edit listing' : 'Add a listing';
+    fields.forEach(function (f) {
+      var el = $('fld_' + f);
+      if (el) el.value = listing ? (listing[f] || '') : '';
+    });
+    if (!listing) { $('fld_status').value = 'To contact'; }
+    $('formPanel').classList.add('open');
+    $('formPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function closeForm() { $('formPanel').classList.remove('open'); editingId = null; }
+
+  async function saveForm() {
+    var obj = {};
+    fields.forEach(function (f) { var el = $('fld_' + f); obj[f] = el ? el.value.trim() : ''; });
+    if (!obj.address && !obj.location) { $('fld_address').focus(); return; }
+    if (editingId) {
+      var i = listings.findIndex(function(l){return l._id===editingId;});
+      if (i > -1) { obj._id = editingId; listings[i] = obj; }
+    } else {
+      obj._id = Date.now() + Math.floor(Math.random()*1000);
+      listings.push(obj);
+    }
+    await save(); refreshFilters(); render(); closeForm();
+  }
+
+  async function delListing(id) {
+    listings = listings.filter(function(l){return l._id !== id;});
+    await save(); refreshFilters(); render();
+  }
+
+  // ---- Excel export with clickable hyperlinks ----
+  function exportXlsx() {
+    var headers = ['Status','Address','Type / Beds','Rent ($/mo)','Location','Visit Date & Time','Commute (D2D)','Commute Time / Route','Contact Name','Contact Number','Contact Method','Photos / Videos','Rating','Notes'];
+    var aoa = [headers];
+    var rows = visibleSorted();
+    rows.forEach(function (l) {
+      var firstPhoto = '';
+      if (l.photos) { var p = l.photos.split(/[,\n]/).map(function(x){return x.trim();}).filter(Boolean); firstPhoto = p[0]||''; }
+      aoa.push([
+        l.status||'', l.address||'', l.type||'',
+        l.rent ? Number(l.rent) : '',
+        l.location||'',
+        l.visit ? new Date(l.visit).toLocaleString() : '',
+        l.commute_url ? 'Open route' : '',
+        l.commute_time||'',
+        l.contact_name||'', l.contact_number||'', l.contact_method||'',
+        firstPhoto ? (l.photos.split(/[,\n]/).filter(function(x){return x.trim();}).length>1 ? 'View photos (+more)' : 'View photos') : '',
+        l.rating ? '★'.repeat(parseInt(l.rating,10)) : '',
+        l.notes||''
+      ]);
+    });
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:15},{wch:34},{wch:16},{wch:12},{wch:16},{wch:20},{wch:13},{wch:26},{wch:18},{wch:16},{wch:18},{wch:18},{wch:9},{wch:44}];
+    // hyperlinks: col G (idx6)=commute, col L (idx11)=photos
+    rows.forEach(function (l, ri) {
+      var r = ri + 1; // data starts row 1 (0-based)
+      if (l.commute_url) {
+        var c = XLSX.utils.encode_cell({r:r, c:6});
+        if (!ws[c]) ws[c] = {t:'s', v:'Open route'};
+        ws[c].l = { Target: l.commute_url, Tooltip: 'Door-to-door transit route' };
+        ws[c].s = { font: { color: { rgb: '2F6D68' }, underline: true } };
+      }
+      if (l.photos) {
+        var fp = l.photos.split(/[,\n]/).map(function(x){return x.trim();}).filter(Boolean)[0];
+        if (fp) {
+          var href = /^https?:\/\//.test(fp) ? fp : 'https://' + fp;
+          var pc = XLSX.utils.encode_cell({r:r, c:11});
+          if (!ws[pc]) ws[pc] = {t:'s', v:'View photos'};
+          ws[pc].l = { Target: href, Tooltip: 'Photos / videos' };
+        }
+      }
+    });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Apartment Visits');
+    XLSX.writeFile(wb, 'NYC_NJ_Apartment_Visits.xlsx');
+  }
+
+  function addSample() {
+    listings.push({
+      _id: Date.now(),
+      status: 'Visit scheduled',
+      location: 'Jersey City',
+      type: '1BR apt',
+      address: '88 Morgan St, Apt 12C, Jersey City, NJ 07302',
+      rent: '2650',
+      visit: '',
+      commute_url: 'https://www.google.com/maps/dir/?api=1&origin=88+Morgan+St+Jersey+City&destination=Your+Office&travelmode=transit',
+      commute_time: '38 min · PATH + 6 min walk',
+      contact_name: 'Sample Broker',
+      contact_number: '+1 555 0100',
+      contact_method: 'WhatsApp',
+      rating: '',
+      photos: 'https://streeteasy.com/listing/example',
+      notes: 'Example row — edit or delete me. Asked about broker fee + move-in date.'
+    });
+    save(); refreshFilters(); render();
+  }
+
+  // ---- events ----
+  document.addEventListener('click', function (e) {
+    var ed = e.target.getAttribute && e.target.getAttribute('data-edit');
+    var dl = e.target.getAttribute && e.target.getAttribute('data-del');
+    if (ed) { var l = listings.find(function(x){return String(x._id)===ed;}); if (l) openForm(l); }
+    if (dl) { delListing(isNaN(dl)?dl:Number(dl)); }
+  });
+  $('addBtn').onclick = function(){ openForm(null); };
+  $('saveBtn').onclick = saveForm;
+  $('cancelBtn').onclick = closeForm;
+  $('exportBtn').onclick = exportXlsx;
+  $('sampleBtn').onclick = addSample;
+  ['fStatus','fLoc','sortBy'].forEach(function(id){ $(id).onchange = render; });
+
+  load().then(function () { refreshFilters(); render(); });
+})();
+</script>
