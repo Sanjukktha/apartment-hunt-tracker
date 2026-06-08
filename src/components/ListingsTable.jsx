@@ -14,6 +14,13 @@ function fmtVisit(v) {
   })
 }
 
+function modeIcon(mode) {
+  if (mode === 'driving-car') return '🚗'
+  if (mode === 'foot-walking') return '🚶'
+  if (mode === 'cycling-regular') return '🚲'
+  return '🚉'
+}
+
 function StatusPill({ status }) {
   const [bg, fg] = STATUS_COLORS[status] || ['#f3ebe0', '#6b6157']
   return (
@@ -185,19 +192,24 @@ function Row({ l, canEdit, onDelete, base }) {
       </td>
       <td className="border-b border-line px-3 py-3">
         {commutes.length ? (
-          <div className="flex flex-col gap-1" onClick={stop}>
+          <div className="flex flex-col gap-2" onClick={stop}>
             {commutes.map((c, i) => (
-              <a
-                key={i}
-                className="link-chip"
-                target="_blank"
-                rel="noopener"
-                href={c.mapsUrl}
-                title={c.address}
-              >
-                {c.label || 'Route'}
-                {c.time ? ` · ${c.time}` : ''}
-              </a>
+              <div key={i} className="flex flex-col">
+                <a
+                  className="link-chip w-fit no-underline"
+                  target="_blank"
+                  rel="noopener"
+                  href={c.mapsUrl}
+                  title={`Open route to ${c.address || c.label} in Google Maps`}
+                >
+                  {modeIcon(c.mode)} {c.label || 'Route'}
+                </a>
+                {(c.time || c.distance) && (
+                  <span className="mt-0.5 text-[12px] text-ink-soft">
+                    {[c.time, c.distance].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+              </div>
             ))}
           </div>
         ) : (
