@@ -12,6 +12,7 @@ import Members from './Members.jsx'
 export default function HuntView({
   hunt,
   listings,
+  deleted = [],
   view,
   listingId,
   isOwner,
@@ -20,6 +21,8 @@ export default function HuntView({
   busy,
   onSaveListing,
   onDeleteListing,
+  onRestoreListing,
+  onPurgeListing,
   onAddSample,
   onExport,
   onSavePrefs,
@@ -68,6 +71,9 @@ export default function HuntView({
           Visitations
         </Tab>
         <span className="flex-1" />
+        <a href={`#${base}/trash`} className="btn btn-ghost no-underline">
+          Trash{deleted.length ? ` (${deleted.length})` : ''}
+        </a>
         <a href={`#${base}/setup`} className="btn btn-ghost no-underline">
           Edit setup
         </a>
@@ -111,6 +117,10 @@ export default function HuntView({
 
         {view === 'visits' && <Visitations listings={listings} base={base} />}
 
+        {view === 'trash' && (
+          <Trash deleted={deleted} base={base} onRestore={onRestoreListing} onPurge={onPurgeListing} />
+        )}
+
         {view === 'leads' && (
           <ListingsTable
             listings={listings}
@@ -139,5 +149,42 @@ function Tab({ href, active, children }) {
     >
       {children}
     </a>
+  )
+}
+
+function Trash({ deleted, base, onRestore, onPurge }) {
+  if (!deleted.length) {
+    return (
+      <div className="card mt-5 p-8 text-center">
+        <h3 className="font-display m-0 mb-1.5 text-[19px]">Trash is empty</h3>
+        <p className="muted">Deleted listings show up here and can be restored.</p>
+        <a href={`#${base}`} className="btn btn-ghost mt-4 inline-block no-underline">
+          Back to listings
+        </a>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-5">
+      <p className="hint mb-3">
+        Deleted listings. Restore brings one back to your list. Delete permanently cannot be undone.
+      </p>
+      <div className="flex flex-col gap-2">
+        {deleted.map((l) => (
+          <div key={l.id} className="card flex flex-wrap items-center gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">{l.address || l.location || 'Untitled'}</div>
+              <div className="hint">{[l.type, l.location].filter(Boolean).join(' · ')}</div>
+            </div>
+            <button className="btn btn-teal" onClick={() => onRestore(l)}>
+              Restore
+            </button>
+            <button className="btn btn-ghost" onClick={() => onPurge(l)}>
+              Delete permanently
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

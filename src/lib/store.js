@@ -137,13 +137,29 @@ export async function listListings(huntId) {
       .from('listings')
       .select('*')
       .eq('hunt_id', huntId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
   }
   return readLS(LS_LISTINGS)
-    .filter((l) => l.hunt_id === huntId)
+    .filter((l) => l.hunt_id === huntId && !l.deleted_at)
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+}
+
+// Soft-deleted listings (the Trash) for a hunt.
+export async function listDeletedListings(huntId) {
+  if (isRemote()) {
+    const { data, error } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('hunt_id', huntId)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  }
+  return readLS(LS_LISTINGS).filter((l) => l.hunt_id === huntId && l.deleted_at)
 }
 
 export async function upsertListing(record) {
@@ -164,7 +180,38 @@ export async function upsertListing(record) {
   return row
 }
 
+// Soft delete: move to Trash (recoverable), do not erase.
 export async function removeListing(id) {
+  if (isRemote()) {
+    const { error } = await supabase.from('listings').update({ deleted_at: nowIso() }).eq('id', id)
+    if (error) throw error
+    return
+  }
+  const rows = readLS(LS_LISTINGS)
+  const i = rows.findIndex((r) => r.id === id)
+  if (i > -1) {
+    rows[i] = { ...rows[i], deleted_at: nowIso() }
+    writeLS(LS_LISTINGS, rows)
+  }
+}
+
+// Bring a trashed listing back.
+export async function restoreListing(id) {
+  if (isRemote()) {
+    const { error } = await supabase.from('listings').update({ deleted_at: null }).eq('id', id)
+    if (error) throw error
+    return
+  }
+  const rows = readLS(LS_LISTINGS)
+  const i = rows.findIndex((r) => r.id === id)
+  if (i > -1) {
+    rows[i] = { ...rows[i], deleted_at: null }
+    writeLS(LS_LISTINGS, rows)
+  }
+}
+
+// Permanently remove a listing (only from the Trash view).
+export async function purgeListing(id) {
   if (isRemote()) {
     const { error } = await supabase.from('listings').delete().eq('id', id)
     if (error) throw error
@@ -179,13 +226,16 @@ export async function allListingsLite() {
     const { data, error } = await supabase
       .from('listings')
       .select('id,hunt_id,status,visit_confirmed')
+      .is('deleted_at', null)
     if (error) throw error
     return data || []
   }
-  return readLS(LS_LISTINGS).map((l) => ({
-    id: l.id,
-    hunt_id: l.hunt_id,
-    status: l.status,
-    visit_confirmed: l.visit_confirmed,
-  }))
+  return readLS(LS_LISTINGS)
+    .filter((l) => !l.deleted_at)
+    .map((l) => ({
+      id: l.id,
+      hunt_id: l.hunt_id,
+      status: l.status,
+      visit_confirmed: l.visit_confirmed,
+    }))
 }

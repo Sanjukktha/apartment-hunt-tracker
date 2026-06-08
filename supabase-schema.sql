@@ -48,7 +48,8 @@ create table if not exists public.listings (
   commutes    jsonb default '[]'::jsonb,
   media       jsonb default '[]'::jsonb,
   added_by    text,
-  user_id     uuid
+  user_id     uuid,
+  deleted_at  timestamptz   -- soft delete: non-null means it is in the Trash
 );
 
 create index if not exists listings_hunt_id_idx on public.listings (hunt_id);

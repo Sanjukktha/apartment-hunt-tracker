@@ -7,8 +7,11 @@ import {
   updateHunt,
   deleteHunt,
   listListings,
+  listDeletedListings,
   upsertListing,
   removeListing,
+  restoreListing,
+  purgeListing,
   listMembers,
   inviteMember,
   removeMember,
@@ -42,6 +45,7 @@ export default function App() {
   const [hunts, setHunts] = useState([])
   const [summary, setSummary] = useState({})
   const [listings, setListings] = useState([])
+  const [deleted, setDeleted] = useState([])
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -98,9 +102,14 @@ export default function App() {
   const currentHunt = route.name === 'hunt' ? hunts.find((h) => h.id === route.huntId) : null
 
   const loadHuntData = useCallback(async (huntId) => {
-    const [ls, ms] = await Promise.all([listListings(huntId), listMembers(huntId)])
+    const [ls, ms, del] = await Promise.all([
+      listListings(huntId),
+      listMembers(huntId),
+      listDeletedListings(huntId),
+    ])
     setListings(ls)
     setMembers(ms)
+    setDeleted(del)
   }, [])
 
   useEffect(() => {
@@ -167,7 +176,7 @@ export default function App() {
   const handleDeleteListing = useCallback(
     async (l) => {
       if (!currentHunt) return
-      if (!window.confirm(`Delete ${l.address || 'this listing'}?`)) return
+      if (!window.confirm(`Move ${l.address || 'this listing'} to Trash? You can restore it later.`)) return
       try {
         await removeListing(l.id)
         await Promise.all([loadHuntData(currentHunt.id), loadHunts()])
@@ -176,6 +185,34 @@ export default function App() {
       }
     },
     [currentHunt, loadHuntData, loadHunts],
+  )
+
+  const handleRestoreListing = useCallback(
+    async (l) => {
+      if (!currentHunt) return
+      try {
+        await restoreListing(l.id)
+        await Promise.all([loadHuntData(currentHunt.id), loadHunts()])
+      } catch (e) {
+        setError(e.message || 'Could not restore')
+      }
+    },
+    [currentHunt, loadHuntData, loadHunts],
+  )
+
+  const handlePurgeListing = useCallback(
+    async (l) => {
+      if (!currentHunt) return
+      if (!window.confirm(`Permanently delete ${l.address || 'this listing'}? This cannot be undone.`))
+        return
+      try {
+        await purgeListing(l.id)
+        await loadHuntData(currentHunt.id)
+      } catch (e) {
+        setError(e.message || 'Could not delete permanently')
+      }
+    },
+    [currentHunt, loadHuntData],
   )
 
   const handleAddSample = useCallback(async () => {
@@ -299,6 +336,7 @@ export default function App() {
           <HuntView
             hunt={currentHunt}
             listings={listings}
+            deleted={deleted}
             view={route.view}
             listingId={route.listingId}
             isOwner={isOwner}
@@ -307,6 +345,8 @@ export default function App() {
             busy={busy}
             onSaveListing={handleSaveListing}
             onDeleteListing={handleDeleteListing}
+            onRestoreListing={handleRestoreListing}
+            onPurgeListing={handlePurgeListing}
             onAddSample={handleAddSample}
             onExport={handleExport}
             onSavePrefs={handleSavePrefs}

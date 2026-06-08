@@ -22,6 +22,7 @@ export function parseHash(hash) {
     if (rest === 'add') return { name: 'hunt', huntId, view: 'add' }
     if (rest === 'setup') return { name: 'hunt', huntId, view: 'setup' }
     if (rest === 'members') return { name: 'hunt', huntId, view: 'members' }
+    if (rest === 'trash') return { name: 'hunt', huntId, view: 'trash' }
     const edit = rest.match(/^edit=(.+)$/)
     if (edit) return { name: 'hunt', huntId, view: 'edit', listingId: decodeURIComponent(edit[1]) }
     const detail = rest.match(/^id=(.+)$/)
