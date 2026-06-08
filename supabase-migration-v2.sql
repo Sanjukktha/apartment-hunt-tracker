@@ -7,11 +7,14 @@
 
 create table if not exists public.hunts (
   id         uuid primary key default gen_random_uuid(),
-  owner_id   uuid not null,
+  owner_id   uuid not null default auth.uid(),
   name       text not null,
   prefs      jsonb default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Ensure the default is present even if the table already existed.
+alter table public.hunts alter column owner_id set default auth.uid();
 
 create table if not exists public.hunt_members (
   id            uuid primary key default gen_random_uuid(),

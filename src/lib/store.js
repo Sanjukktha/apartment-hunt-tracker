@@ -39,11 +39,6 @@ function writeLS(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-async function currentUid() {
-  const { data } = await supabase.auth.getUser()
-  return data?.user?.id || null
-}
-
 // ---- Hunts ----
 
 export async function listHunts() {
@@ -60,10 +55,11 @@ export async function listHunts() {
 
 export async function createHunt({ name, prefs }) {
   if (isRemote()) {
-    const owner_id = await currentUid()
+    // owner_id is filled by the database default auth.uid(), so it always matches
+    // the RLS check and the browser never has to send it.
     const { data, error } = await supabase
       .from('hunts')
-      .insert({ name, prefs: prefs || {}, owner_id })
+      .insert({ name, prefs: prefs || {} })
       .select()
       .single()
     if (error) throw error

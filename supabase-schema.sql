@@ -10,7 +10,7 @@
 
 create table if not exists public.hunts (
   id         uuid primary key default gen_random_uuid(),
-  owner_id   uuid not null,
+  owner_id   uuid not null default auth.uid(),
   name       text not null,
   prefs      jsonb default '{}'::jsonb,   -- { searchAreas, closeTo, defaultMode }
   created_at timestamptz not null default now()
