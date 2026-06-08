@@ -49,6 +49,8 @@ export default function ListingForm({ prefs, listing, onSave, onCancel }) {
   const [saving, setSaving] = useState(false)
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+  // Date-only field stored as midnight, so the window defaults to 12:00 AM, not "now".
+  const setDay = (k) => (e) => setForm({ ...form, [k]: e.target.value ? e.target.value + 'T00:00' : '' })
   const setCommute = (areaId, patch) =>
     setCommutes((c) => ({ ...c, [areaId]: { ...c[areaId], ...patch } }))
 
@@ -179,18 +181,18 @@ export default function ListingForm({ prefs, listing, onSave, onCancel }) {
                       Anytime from
                       <input
                         className="input"
-                        type="datetime-local"
-                        value={form.visit_window_start}
-                        onChange={set('visit_window_start')}
+                        type="date"
+                        value={(form.visit_window_start || '').slice(0, 10)}
+                        onChange={setDay('visit_window_start')}
                       />
                     </label>
                     <label className="hint flex flex-col gap-1">
                       until
                       <input
                         className="input"
-                        type="datetime-local"
-                        value={form.visit_window_end}
-                        onChange={set('visit_window_end')}
+                        type="date"
+                        value={(form.visit_window_end || '').slice(0, 10)}
+                        onChange={setDay('visit_window_end')}
                       />
                     </label>
                   </div>

@@ -227,8 +227,8 @@ function Row({ l, canEdit, onDelete, base }) {
       <td className="whitespace-nowrap border-b border-line px-3 py-3">
         {l.rating ? <span className="stars">{'★'.repeat(Number(l.rating))}</span> : <span className="muted">-</span>}
       </td>
-      <td className="max-w-[240px] border-b border-line px-3 py-3 text-[12.5px] text-ink-soft">
-        {l.notes || ''}
+      <td className="border-b border-line px-3 py-3">
+        <div className="line-clamp-3 max-w-[240px] text-[12.5px] text-ink-soft">{l.notes || ''}</div>
       </td>
       <td className="border-b border-line px-3 py-3" onClick={stop}>
         {canEdit && (
