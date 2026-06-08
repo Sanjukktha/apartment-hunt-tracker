@@ -14,13 +14,13 @@ function fmtVisit(v) {
   })
 }
 
-export default function ListingDetail({ listing, canEdit }) {
+export default function ListingDetail({ listing, canEdit, base }) {
   if (!listing) {
     return (
       <div className="card mt-6 p-8 text-center">
         <h3 className="font-display m-0 mb-1.5 text-[20px]">Listing not found</h3>
         <p className="muted">It may have been deleted, or the link points to a different dataset.</p>
-        <a href="#list" className="btn btn-ghost mt-4 inline-block no-underline">
+        <a href={`#${base}`} className="btn btn-ghost mt-4 inline-block no-underline">
           Back to all listings
         </a>
       </div>
@@ -34,11 +34,11 @@ export default function ListingDetail({ listing, canEdit }) {
   return (
     <div className="mt-5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <a href="#list" className="link-chip no-underline">
+        <a href={`#${base}`} className="link-chip no-underline">
           ← All listings
         </a>
         {canEdit && (
-          <a href={'#edit=' + encodeURIComponent(listing.id)} className="btn btn-ghost ml-auto no-underline">
+          <a href={`#${base}/edit=` + encodeURIComponent(listing.id)} className="btn btn-ghost ml-auto no-underline">
             Edit
           </a>
         )}

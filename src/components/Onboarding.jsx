@@ -1,17 +1,15 @@
 import { useState } from 'react'
-import { TRAVEL_MODES, MAX_CLOSE_TO, newCloseTo, savePrefs } from '../lib/prefs.js'
+import { TRAVEL_MODES, MAX_CLOSE_TO, newCloseTo, emptyPrefs } from '../lib/prefs.js'
 
-// First-run setup. Captures where the user is searching and the up-to-3 places
-// they want to be close to, which drive the commute links on every listing.
-export default function Onboarding({ initial, onComplete }) {
-  const [ownerName, setOwnerName] = useState(initial?.ownerName || '')
+// Per-hunt setup. Captures where the user is searching and the up-to-3 places
+// they want to be close to. Builds a prefs object and hands it to onComplete;
+// the parent persists it onto the hunt.
+export default function Onboarding({ initial, huntName, onComplete, onCancel, busy }) {
+  const base = { ...emptyPrefs(), ...(initial || {}) }
   const [areaInput, setAreaInput] = useState('')
-  const [searchAreas, setSearchAreas] = useState(initial?.searchAreas || [])
-  const [closeTo, setCloseTo] = useState(
-    initial?.closeTo?.length ? initial.closeTo : [newCloseTo()],
-  )
-  const [defaultMode, setDefaultMode] = useState(initial?.defaultMode || 'transit')
-  const [saving, setSaving] = useState(false)
+  const [searchAreas, setSearchAreas] = useState(base.searchAreas)
+  const [closeTo, setCloseTo] = useState(base.closeTo.length ? base.closeTo : [newCloseTo()])
+  const [defaultMode, setDefaultMode] = useState(base.defaultMode)
 
   function addArea() {
     const v = areaInput.trim()
@@ -20,64 +18,41 @@ export default function Onboarding({ initial, onComplete }) {
     setAreaInput('')
   }
 
-  function removeArea(a) {
-    setSearchAreas(searchAreas.filter((x) => x !== a))
-  }
-
-  function updateCloseTo(id, patch) {
+  const removeArea = (a) => setSearchAreas(searchAreas.filter((x) => x !== a))
+  const updateCloseTo = (id, patch) =>
     setCloseTo(closeTo.map((c) => (c.id === id ? { ...c, ...patch } : c)))
-  }
-
-  function addCloseTo() {
-    if (closeTo.length >= MAX_CLOSE_TO) return
-    setCloseTo([...closeTo, newCloseTo()])
-  }
-
-  function removeCloseTo(id) {
-    setCloseTo(closeTo.filter((c) => c.id !== id))
-  }
+  const addCloseTo = () => closeTo.length < MAX_CLOSE_TO && setCloseTo([...closeTo, newCloseTo()])
+  const removeCloseTo = (id) => setCloseTo(closeTo.filter((c) => c.id !== id))
 
   const validCloseTo = closeTo.filter((c) => c.label.trim() || c.address.trim())
   const canContinue = searchAreas.length > 0 && validCloseTo.length > 0
 
-  async function finish() {
-    setSaving(true)
+  function finish() {
     const cleaned = validCloseTo.map((c) => ({
       ...c,
       label: c.label.trim(),
       address: c.address.trim(),
     }))
-    const prefs = await savePrefs({
-      ownerName: ownerName.trim(),
+    onComplete({
       searchAreas,
       closeTo: cleaned,
       defaultMode,
       setupComplete: true,
     })
-    setSaving(false)
-    onComplete(prefs)
   }
 
   return (
-    <div className="mx-auto max-w-[760px] px-[clamp(14px,4vw,44px)] pt-12 pb-16">
-      <h1 className="font-display m-0 text-[clamp(28px,4.5vw,40px)] font-semibold leading-[1.08] tracking-[-0.02em]">
-        Let us set up your <em className="text-terra italic">hunt</em>
+    <div className="mx-auto max-w-[760px] px-[clamp(14px,4vw,44px)] pt-10 pb-16">
+      <h1 className="font-display m-0 text-[clamp(26px,4.5vw,38px)] font-semibold leading-[1.08] tracking-[-0.02em]">
+        Set up <em className="text-terra italic">{huntName || 'this hunt'}</em>
       </h1>
       <p className="mt-2 max-w-[54ch] text-[15px] text-ink-soft">
-        Tell us where you are looking and what you want to be near. We use this to build a
-        one-click commute link for every place you add.
+        Tell us where you are looking and what you want to be near. We use this to build a one-click
+        commute link for every place you add to this hunt.
       </p>
 
-      <div className="card mt-7 p-6">
-        <label className="field-label">Your name (optional)</label>
-        <input
-          className="input"
-          placeholder="So shared entries show who added them"
-          value={ownerName}
-          onChange={(e) => setOwnerName(e.target.value)}
-        />
-
-        <div className="mt-6">
+      <div className="card mt-6 p-6">
+        <div>
           <label className="field-label">Where are you searching?</label>
           <p className="hint mb-2">
             Add the cities or neighborhoods you care about. These become your location filters.
@@ -148,7 +123,6 @@ export default function Onboarding({ initial, onComplete }) {
                     className="btn btn-ghost shrink-0"
                     onClick={() => removeCloseTo(c.id)}
                     type="button"
-                    aria-label="Remove this place"
                   >
                     Remove
                   </button>
@@ -181,9 +155,14 @@ export default function Onboarding({ initial, onComplete }) {
         </div>
 
         <div className="mt-7 flex items-center gap-3">
-          <button className="btn btn-primary" onClick={finish} disabled={!canContinue || saving}>
-            {saving ? 'Saving...' : 'Start tracking'}
+          <button className="btn btn-primary" onClick={finish} disabled={!canContinue || busy}>
+            {busy ? 'Saving...' : 'Save and start logging'}
           </button>
+          {onCancel && (
+            <button className="btn btn-ghost" onClick={onCancel} disabled={busy} type="button">
+              Cancel
+            </button>
+          )}
           {!canContinue && (
             <span className="hint">Add at least one search area and one place to be close to.</span>
           )}

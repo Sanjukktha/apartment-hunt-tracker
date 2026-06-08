@@ -1,15 +1,13 @@
 // SheetJS is loaded on demand (only when exporting) to keep the main bundle small.
 
 // Where the media cell deep links point. Configurable so links work once hosted;
-// falls back to the current page. ?cloud=1 is appended in remote mode so the
-// linked detail page shows the shared dataset.
-function siteBase(isRemote) {
+// falls back to the current page.
+function siteBase() {
   let base = import.meta.env.VITE_SITE_URL || window.location.origin + window.location.pathname
-  base = base.replace(/[#?].*$/, '')
-  return isRemote ? base + '?cloud=1' : base
+  return base.replace(/[#?].*$/, '')
 }
 
-export async function exportListings(listings, prefs, isRemote) {
+export async function exportListings(listings, prefs, huntId) {
   const XLSX = await import('xlsx')
   const areas = (prefs && prefs.closeTo) || []
 
@@ -45,7 +43,7 @@ export async function exportListings(listings, prefs, isRemote) {
   const ws = XLSX.utils.aoa_to_sheet(aoa)
   ws['!cols'] = headers.map((h, i) => ({ wch: i === 1 ? 34 : i === headers.length - 1 ? 44 : 16 }))
 
-  const base = siteBase(isRemote)
+  const base = siteBase()
   const areaStart = 6
   const mediaCol = areaStart + areas.length + 3
 
@@ -66,7 +64,7 @@ export async function exportListings(listings, prefs, isRemote) {
       ws[ref] = {
         t: 's',
         v: `${l.media.length} item(s)`,
-        l: { Target: base + '#id=' + l.id, Tooltip: 'Open the listing page' },
+        l: { Target: base + '#hunt=' + huntId + '/id=' + l.id, Tooltip: 'Open the listing page' },
       }
     }
   })

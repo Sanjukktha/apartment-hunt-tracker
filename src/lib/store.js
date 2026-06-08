@@ -1,55 +1,21 @@
 import { supabase, cloudConfigured } from './supabase.js'
 
-// Data layer abstraction. Same three methods (all / upsert / remove) regardless
-// of where the data lives. Local mode uses the browser's localStorage so the app
-// works with zero setup. Remote mode uses Supabase so a shared link shows the
-// same data to everyone.
+// Data layer (v2). The app is account-based: a signed-in user owns hunts, each
+// hunt holds listings, and the owner can invite collaborators by email.
+//
+// When Supabase is configured (production) everything is remote and requires
+// sign-in. When it is not (local dev), it falls back to localStorage with a
+// single implicit local user so the app still runs without a backend.
 
-const LS_LISTINGS = 'apt_listings_v1'
-const LS_MODE = 'apt_mode_v1'
-const TABLE = 'listings'
+const LS_HUNTS = 'apt_hunts_v2'
+const LS_LISTINGS = 'apt_listings_v2'
 
-function readLocal() {
-  try {
-    return JSON.parse(localStorage.getItem(LS_LISTINGS) || '[]')
-  } catch {
-    return []
-  }
-}
-
-function writeLocal(rows) {
-  localStorage.setItem(LS_LISTINGS, JSON.stringify(rows))
-}
-
-// Whether the build has Supabase configured at all.
 export function cloudAvailable() {
   return cloudConfigured
 }
 
-// A shared link carries ?cloud=1 so family who open it boot straight into the
-// cloud view without flipping anything.
-function urlForcesCloud() {
-  try {
-    return new URLSearchParams(window.location.search).get('cloud') === '1'
-  } catch {
-    return false
-  }
-}
-
-// 'remote' only when the cloud is configured AND either the URL forces it or the
-// user flipped the toggle on this device. Otherwise 'local'.
-export function getMode() {
-  if (!cloudConfigured) return 'local'
-  if (urlForcesCloud()) return 'remote'
-  return localStorage.getItem(LS_MODE) === 'remote' ? 'remote' : 'local'
-}
-
-export function setMode(mode) {
-  localStorage.setItem(LS_MODE, mode === 'remote' ? 'remote' : 'local')
-}
-
 export function isRemote() {
-  return getMode() === 'remote'
+  return cloudConfigured
 }
 
 export function newId() {
@@ -61,53 +27,169 @@ function nowIso() {
   return new Date().toISOString()
 }
 
-export async function all() {
+function readLS(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function writeLS(key, value) {
+  localStorage.setItem(key, JSON.stringify(value))
+}
+
+async function currentUid() {
+  const { data } = await supabase.auth.getUser()
+  return data?.user?.id || null
+}
+
+// ---- Hunts ----
+
+export async function listHunts() {
   if (isRemote()) {
     const { data, error } = await supabase
-      .from(TABLE)
+      .from('hunts')
       .select('*')
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return data || []
+  }
+  return readLS(LS_HUNTS)
+}
+
+export async function createHunt({ name, prefs }) {
+  if (isRemote()) {
+    const owner_id = await currentUid()
+    const { data, error } = await supabase
+      .from('hunts')
+      .insert({ name, prefs: prefs || {}, owner_id })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+  const hunt = { id: newId(), name, prefs: prefs || {}, owner_id: 'local', created_at: nowIso() }
+  const hunts = readLS(LS_HUNTS)
+  hunts.push(hunt)
+  writeLS(LS_HUNTS, hunts)
+  return hunt
+}
+
+export async function updateHunt(id, patch) {
+  if (isRemote()) {
+    const { data, error } = await supabase.from('hunts').update(patch).eq('id', id).select().single()
+    if (error) throw error
+    return data
+  }
+  const hunts = readLS(LS_HUNTS)
+  const i = hunts.findIndex((h) => h.id === id)
+  if (i > -1) {
+    hunts[i] = { ...hunts[i], ...patch }
+    writeLS(LS_HUNTS, hunts)
+    return hunts[i]
+  }
+  return null
+}
+
+export async function deleteHunt(id) {
+  if (isRemote()) {
+    const { error } = await supabase.from('hunts').delete().eq('id', id)
+    if (error) throw error
+    return
+  }
+  writeLS(LS_HUNTS, readLS(LS_HUNTS).filter((h) => h.id !== id))
+  writeLS(LS_LISTINGS, readLS(LS_LISTINGS).filter((l) => l.hunt_id !== id))
+}
+
+// ---- Members (remote only; local dev is single-user) ----
+
+export async function listMembers(huntId) {
+  if (!isRemote()) return []
+  const { data, error } = await supabase
+    .from('hunt_members')
+    .select('*')
+    .eq('hunt_id', huntId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function inviteMember(huntId, email) {
+  if (!isRemote()) return null
+  const invited_email = email.trim().toLowerCase()
+  const { data, error } = await supabase
+    .from('hunt_members')
+    .insert({ hunt_id: huntId, invited_email })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function removeMember(memberId) {
+  if (!isRemote()) return
+  const { error } = await supabase.from('hunt_members').delete().eq('id', memberId)
+  if (error) throw error
+}
+
+// ---- Listings (scoped to a hunt) ----
+
+export async function listListings(huntId) {
+  if (isRemote()) {
+    const { data, error } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('hunt_id', huntId)
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
   }
-  return readLocal().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  return readLS(LS_LISTINGS)
+    .filter((l) => l.hunt_id === huntId)
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 }
 
-export async function upsert(record) {
+export async function upsertListing(record) {
   const row = { ...record }
   if (!row.id) row.id = newId()
   if (!row.created_at) row.created_at = nowIso()
 
   if (isRemote()) {
-    const { data, error } = await supabase.from(TABLE).upsert(row).select().single()
+    const { data, error } = await supabase.from('listings').upsert(row).select().single()
     if (error) throw error
     return data
   }
-
-  const rows = readLocal()
+  const rows = readLS(LS_LISTINGS)
   const i = rows.findIndex((r) => r.id === row.id)
   if (i > -1) rows[i] = row
   else rows.unshift(row)
-  writeLocal(rows)
+  writeLS(LS_LISTINGS, rows)
   return row
 }
 
-export async function remove(id) {
+export async function removeListing(id) {
   if (isRemote()) {
-    const { error } = await supabase.from(TABLE).delete().eq('id', id)
+    const { error } = await supabase.from('listings').delete().eq('id', id)
     if (error) throw error
     return
   }
-  writeLocal(readLocal().filter((r) => r.id !== id))
+  writeLS(LS_LISTINGS, readLS(LS_LISTINGS).filter((r) => r.id !== id))
 }
 
-// When flipping the cloud on, copy whatever is already saved locally up to
-// Supabase so nothing entered during the trip is lost. Caller passes the current
-// user attribution so the rows satisfy the write policies.
-export async function pushLocalToCloud(attribution = {}) {
-  const rows = readLocal().map((r) => ({ ...r, ...attribution }))
-  if (!rows.length) return 0
-  const { error } = await supabase.from(TABLE).upsert(rows)
-  if (error) throw error
-  return rows.length
+// Lightweight roll-up across every hunt the user can see, for the dashboard.
+export async function allListingsLite() {
+  if (isRemote()) {
+    const { data, error } = await supabase
+      .from('listings')
+      .select('id,hunt_id,status,visit_confirmed')
+    if (error) throw error
+    return data || []
+  }
+  return readLS(LS_LISTINGS).map((l) => ({
+    id: l.id,
+    hunt_id: l.hunt_id,
+    status: l.status,
+    visit_confirmed: l.visit_confirmed,
+  }))
 }

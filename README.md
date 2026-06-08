@@ -12,7 +12,8 @@ I built it for my own move and then generalized it so anyone can use it for any 
 - **Photos and videos by link.** Paste a link (Google Drive, Google Photos, Imgur, the listing page). The detail page shows images in a gallery and plays videos. Links keep storage free.
 - **Visit planning.** Mark a listing "Visit confirmed" with either a specific time or a flexible window. The Visitations tab collects them all, and a schedule generator clusters confirmed visits by real distance (not by area name), respects your fixed times and windows, and suggests an efficient order per group with a clickable Google Maps walking route.
 - **Excel export.** One click produces an .xlsx. The commute cells link to the Maps routes, and the media cell links back to that listing's page on the live site, since a spreadsheet cannot hold real images.
-- **Local first, share when ready.** With no setup it runs entirely in your browser (localStorage). Add Supabase keys and you can flip a switch to go remote, which copies your local listings up and gives you a link to share. Viewing the shared link is open to anyone; adding or editing requires a quick Google sign-in.
+- **Accounts and hunts.** Sign in with Google and organize your search into named hunts (for example "New Jersey Hunting" and "Texas Hunting"). A dashboard shows each hunt with its lead and confirmed-visit counts. Each hunt has its own Leads and Visitations tabs.
+- **Collaboration.** Invite family by their Google email. Once they sign in, the hunt appears on their dashboard and they can view and add listings. Only the owner can rename or delete a hunt and manage its members.
 
 ## Tech
 
@@ -62,18 +63,23 @@ All configuration is environment variables. See `.env.example`.
 3. Add the four environment variables in the Vercel project settings (set `VITE_SITE_URL` to the deployed URL).
 4. Deploy. The `api/route.js` function runs automatically as the routing backend.
 
-## How sharing works
+## How accounts and collaboration work
 
-The app is local-only until you click "Go remote and share". That copies your local listings to Supabase, switches this browser to cloud mode, and updates the URL with `?cloud=1`. The "Share link" button copies that URL. Anyone who opens it sees the shared list and can view freely. To add or edit, they sign in with Google. The anon key in the page can only do what the row level security policies allow.
+Everyone signs in with Google. A signed-in user owns hunts; each hunt holds its own listings and setup. The owner invites a collaborator by entering their Google email in the hunt's Members panel. No email is sent, so the owner just tells them to sign in. When that person signs in with the invited email, Supabase row level security (via the `has_hunt_access` function) lets them read and add listings in that hunt, and the hunt shows up on their dashboard. Only the owner can rename or delete the hunt and manage members.
+
+Local mode (no Supabase keys configured) is for development only. It uses localStorage with a single implicit user and no sign-in. In any deployed setup the app is always signed in and cloud backed.
 
 ## Project layout
 
 ```
-api/route.js          serverless OpenRouteService proxy (the backend)
-api/_ors.js           shared routing logic (used by the function and dev server)
-src/lib/              store, supabase, prefs, auth, commute, excel, constants
-src/components/       Onboarding, Header, ListingsTable, ListingForm, ListingDetail, MediaGallery
+api/route.js          serverless OpenRouteService proxy (commute time/distance)
+api/geocode.js        serverless geocoder for the schedule generator
+api/_ors.js           shared routing logic (used by the functions and dev server)
+src/lib/              store, supabase, prefs, auth, commute, geocode, scheduler, geo, excel, constants
+src/components/       Landing, TopBar, Dashboard, HuntView, Onboarding, Members,
+                      ListingsTable, ListingForm, ListingDetail, MediaGallery, Visitations
 src/hooks/            hash router
-supabase-schema.sql   database tables, grants, and policies
-docs/                 the original idea and the first HTML prototype
+supabase-schema.sql   full schema (new projects)
+supabase-migration-v2.sql   upgrade an existing v1 database
+docs/                 the original idea, the first HTML prototype, and SETUP.md
 ```

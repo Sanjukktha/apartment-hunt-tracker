@@ -59,6 +59,7 @@ export default function ListingsTable({
   onDelete,
   onExport,
   onAddSample,
+  base,
 }) {
   const [fStatus, setFStatus] = useState('')
   const [fLoc, setFLoc] = useState('')
@@ -89,7 +90,7 @@ export default function ListingsTable({
     <div>
       <div className="my-4 flex flex-wrap items-center gap-2.5">
         {canEdit && (
-          <a href="#add" className="btn btn-primary no-underline">
+          <a href={`#${base}/add`} className="btn btn-primary no-underline">
             + Add listing
           </a>
         )}
@@ -140,7 +141,7 @@ export default function ListingsTable({
           </thead>
           <tbody>
             {rows.map((l) => (
-              <Row key={l.id} l={l} canEdit={canEdit} onDelete={onDelete} />
+              <Row key={l.id} l={l} canEdit={canEdit} onDelete={onDelete} base={base} />
             ))}
           </tbody>
         </table>
@@ -160,8 +161,8 @@ export default function ListingsTable({
   )
 }
 
-function Row({ l, canEdit, onDelete }) {
-  const go = () => navigate('id=' + encodeURIComponent(l.id))
+function Row({ l, canEdit, onDelete, base }) {
+  const go = () => navigate(`${base}/id=` + encodeURIComponent(l.id))
   const stop = (e) => e.stopPropagation()
   const commutes = Array.isArray(l.commutes) ? l.commutes.filter((c) => c.mapsUrl) : []
   const mediaCount = Array.isArray(l.media) ? l.media.length : 0
@@ -233,7 +234,7 @@ function Row({ l, canEdit, onDelete }) {
         {canEdit && (
           <div className="flex gap-1.5">
             <a
-              href={'#edit=' + encodeURIComponent(l.id)}
+              href={`#${base}/edit=` + encodeURIComponent(l.id)}
               className="grid h-[30px] w-[30px] place-items-center rounded-lg border border-line bg-paper-2 text-[14px] no-underline hover:bg-terra-soft"
               title="Edit"
             >

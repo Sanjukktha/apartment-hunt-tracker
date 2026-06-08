@@ -1,19 +1,35 @@
 import { useEffect, useState } from 'react'
 
-// Hash routing keeps the app working on static hosting and makes deep links
-// possible. Routes: #list (default), #add, #edit=<id>, #id=<id> (detail),
-// #settings. The #id form is what the Excel export points back to.
+// Hash routing (v2). Routes:
+//   #dashboard (default)
+//   #hunt=<id>            leads tab
+//   #hunt=<id>/visits     visitations tab
+//   #hunt=<id>/add        new listing
+//   #hunt=<id>/edit=<lid> edit listing
+//   #hunt=<id>/id=<lid>   listing detail (Excel deep links point here)
+//   #hunt=<id>/setup      edit this hunt's setup
+//   #hunt=<id>/members    collaborators
 export function parseHash(hash) {
   const h = (hash || '').replace(/^#/, '')
-  if (!h || h === 'list') return { name: 'list' }
-  if (h === 'add') return { name: 'add' }
-  if (h === 'visits') return { name: 'visits' }
-  if (h === 'settings') return { name: 'settings' }
-  const edit = h.match(/^edit=(.+)$/)
-  if (edit) return { name: 'edit', id: decodeURIComponent(edit[1]) }
-  const detail = h.match(/^id=(.+)$/)
-  if (detail) return { name: 'detail', id: decodeURIComponent(detail[1]) }
-  return { name: 'list' }
+  if (!h || h === 'dashboard') return { name: 'dashboard' }
+
+  const hunt = h.match(/^hunt=([^/]+)(?:\/(.*))?$/)
+  if (hunt) {
+    const huntId = decodeURIComponent(hunt[1])
+    const rest = hunt[2] || ''
+    if (!rest || rest === 'leads') return { name: 'hunt', huntId, view: 'leads' }
+    if (rest === 'visits') return { name: 'hunt', huntId, view: 'visits' }
+    if (rest === 'add') return { name: 'hunt', huntId, view: 'add' }
+    if (rest === 'setup') return { name: 'hunt', huntId, view: 'setup' }
+    if (rest === 'members') return { name: 'hunt', huntId, view: 'members' }
+    const edit = rest.match(/^edit=(.+)$/)
+    if (edit) return { name: 'hunt', huntId, view: 'edit', listingId: decodeURIComponent(edit[1]) }
+    const detail = rest.match(/^id=(.+)$/)
+    if (detail) return { name: 'hunt', huntId, view: 'detail', listingId: decodeURIComponent(detail[1]) }
+    return { name: 'hunt', huntId, view: 'leads' }
+  }
+
+  return { name: 'dashboard' }
 }
 
 export function navigate(route) {

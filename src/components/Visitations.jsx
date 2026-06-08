@@ -34,7 +34,7 @@ function timingLabel(l) {
   return 'Time not set yet'
 }
 
-export default function Visitations({ listings }) {
+export default function Visitations({ listings, base }) {
   const confirmed = useMemo(() => listings.filter((l) => l.visit_confirmed), [listings])
   const [thresholdKm, setThresholdKm] = useState(2.4)
   const [result, setResult] = useState(null)
@@ -84,7 +84,7 @@ export default function Visitations({ listings }) {
             Open a listing, tick "Visit confirmed", and set a time or a flexible window. It will
             show up here.
           </p>
-          <a href="#list" className="btn btn-ghost mt-4 inline-block no-underline">
+          <a href={`#${base}`} className="btn btn-ghost mt-4 inline-block no-underline">
             Back to all listings
           </a>
         </div>
@@ -124,21 +124,21 @@ export default function Visitations({ listings }) {
           {!result && (
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {confirmed.map((l) => (
-                <ConfirmedCard key={l.id} l={l} />
+                <ConfirmedCard key={l.id} l={l} base={base} />
               ))}
             </div>
           )}
 
-          {result && <ScheduleResult result={result} />}
+          {result && <ScheduleResult result={result} base={base} />}
         </>
       )}
     </div>
   )
 }
 
-function ConfirmedCard({ l }) {
+function ConfirmedCard({ l, base }) {
   return (
-    <a href={'#id=' + encodeURIComponent(l.id)} className="card block p-4 no-underline text-ink">
+    <a href={`#${base}/id=` + encodeURIComponent(l.id)} className="card block p-4 no-underline text-ink">
       <div className="font-semibold">{l.address || l.location || 'Untitled'}</div>
       <div className="hint mt-0.5">{[l.type, l.location].filter(Boolean).join(' · ')}</div>
       <div className="mt-2 text-[13.5px]">{timingLabel(l)}</div>
@@ -151,7 +151,7 @@ function ConfirmedCard({ l }) {
   )
 }
 
-function ScheduleResult({ result }) {
+function ScheduleResult({ result, base }) {
   return (
     <div className="mt-5">
       <div className="mb-3 flex items-center gap-2">
@@ -196,7 +196,7 @@ function ScheduleResult({ result }) {
                   </span>
                   <div className="flex-1 border-b border-line pb-2">
                     <a
-                      href={'#id=' + encodeURIComponent(s.listing.id)}
+                      href={`#${base}/id=` + encodeURIComponent(s.listing.id)}
                       className="font-semibold text-ink no-underline hover:text-terra"
                     >
                       {s.listing.address || s.listing.location || 'Untitled'}
