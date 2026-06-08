@@ -19,6 +19,7 @@ import Onboarding from './components/Onboarding.jsx'
 import ListingsTable from './components/ListingsTable.jsx'
 import ListingForm from './components/ListingForm.jsx'
 import ListingDetail from './components/ListingDetail.jsx'
+import Visitations from './components/Visitations.jsx'
 
 export default function App() {
   const route = useHashRoute()
@@ -68,7 +69,7 @@ export default function App() {
   const stats = useMemo(
     () => ({
       total: listings.length,
-      visits: listings.filter((l) => l.status === 'Visit scheduled' || l.visit).length,
+      visits: listings.filter((l) => l.visit_confirmed).length,
       liked: listings.filter((l) => l.status === 'Interested').length,
     }),
     [listings],
@@ -214,6 +215,15 @@ export default function App() {
         onSignOut={signOut}
       />
 
+      <nav className="mt-4 flex gap-2">
+        <Tab href="#list" active={route.name !== 'visits'}>
+          All listings
+        </Tab>
+        <Tab href="#visits" active={route.name === 'visits'}>
+          Visitations{stats.visits ? ` (${stats.visits})` : ''}
+        </Tab>
+      </nav>
+
       {error && (
         <div
           className="mt-4 rounded-xl border border-line px-4 py-2 text-[13.5px]"
@@ -260,6 +270,8 @@ export default function App() {
           ))}
 
         {route.name === 'detail' && <ListingDetail listing={byId(route.id)} canEdit={canEdit} />}
+
+        {route.name === 'visits' && <Visitations listings={listings} />}
       </main>
 
       <footer className="mt-10 flex flex-wrap gap-3 border-t border-line pt-4 text-[12.5px] text-ink-soft">
@@ -271,6 +283,22 @@ export default function App() {
         </span>
       </footer>
     </div>
+  )
+}
+
+function Tab({ href, active, children }) {
+  return (
+    <a
+      href={href}
+      className="pill no-underline"
+      style={
+        active
+          ? { background: 'var(--color-terra)', color: '#fff' }
+          : { background: 'var(--color-paper-2)', color: 'var(--color-ink-soft)' }
+      }
+    >
+      {children}
+    </a>
   )
 }
 

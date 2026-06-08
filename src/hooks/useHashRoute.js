@@ -7,6 +7,7 @@ export function parseHash(hash) {
   const h = (hash || '').replace(/^#/, '')
   if (!h || h === 'list') return { name: 'list' }
   if (h === 'add') return { name: 'add' }
+  if (h === 'visits') return { name: 'visits' }
   if (h === 'settings') return { name: 'settings' }
   const edit = h.match(/^edit=(.+)$/)
   if (edit) return { name: 'edit', id: decodeURIComponent(edit[1]) }

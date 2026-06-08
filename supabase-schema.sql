@@ -12,7 +12,11 @@ create table if not exists public.listings (
   type        text,
   rent        numeric,
   location    text,
-  visit       text,          -- the datetime-local string as entered
+  visit              text,    -- the datetime-local string for a specific time
+  visit_confirmed    boolean default false,
+  visit_timing_type  text,    -- 'fixed' | 'flexible' | 'open'
+  visit_window_start text,    -- flexible window start (datetime-local string)
+  visit_window_end   text,    -- flexible window end (datetime-local string)
   rating      int,
   notes       text,
   contact_name   text,

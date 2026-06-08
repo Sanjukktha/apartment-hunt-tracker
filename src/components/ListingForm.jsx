@@ -10,6 +10,10 @@ const BLANK = {
   address: '',
   rent: '',
   visit: '',
+  visit_confirmed: false,
+  visit_timing_type: 'fixed',
+  visit_window_start: '',
+  visit_window_end: '',
   contact_name: '',
   contact_number: '',
   contact_method: 'WhatsApp',
@@ -144,9 +148,64 @@ export default function ListingForm({ prefs, listing, onSave, onCancel }) {
           <input className="input" type="number" min="0" step="50" value={form.rent ?? ''} onChange={set('rent')} placeholder="2400" />
         </Field>
 
-        <Field label="Visit date and time">
-          <input className="input" type="datetime-local" value={form.visit} onChange={set('visit')} />
-        </Field>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <label className="field-label">Visit</label>
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-[14px]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--color-terra)]"
+              checked={!!form.visit_confirmed}
+              onChange={(e) => setForm({ ...form, visit_confirmed: e.target.checked })}
+            />
+            Visit confirmed
+          </label>
+
+          {form.visit_confirmed && (
+            <div className="mt-3 rounded-xl border border-line bg-paper-2/40 p-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[200px_1fr]">
+                <select className="input" value={form.visit_timing_type} onChange={set('visit_timing_type')}>
+                  <option value="fixed">Specific time</option>
+                  <option value="flexible">Flexible window</option>
+                  <option value="open">Time not set yet</option>
+                </select>
+
+                {form.visit_timing_type === 'fixed' && (
+                  <input className="input" type="datetime-local" value={form.visit} onChange={set('visit')} />
+                )}
+
+                {form.visit_timing_type === 'flexible' && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label className="hint flex flex-col gap-1">
+                      Anytime from
+                      <input
+                        className="input"
+                        type="datetime-local"
+                        value={form.visit_window_start}
+                        onChange={set('visit_window_start')}
+                      />
+                    </label>
+                    <label className="hint flex flex-col gap-1">
+                      until
+                      <input
+                        className="input"
+                        type="datetime-local"
+                        value={form.visit_window_end}
+                        onChange={set('visit_window_end')}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {form.visit_timing_type === 'open' && (
+                  <p className="hint self-center">
+                    Confirmed, but no time yet. The schedule generator will slot it around your fixed
+                    visits.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <Field label="Rating (after visit)">
           <select className="input" value={form.rating ?? ''} onChange={set('rating')}>

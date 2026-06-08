@@ -23,6 +23,36 @@ function StatusPill({ status }) {
   )
 }
 
+function fmtWindow(l) {
+  const s = l.visit_window_start ? fmtVisit(l.visit_window_start) : null
+  const e = l.visit_window_end ? fmtVisit(l.visit_window_end) : null
+  if (s && e) return `${s} to ${e}`
+  if (s) return `from ${s}`
+  if (e) return `by ${e}`
+  return null
+}
+
+function VisitCell({ l }) {
+  const confirmed = !!l.visit_confirmed
+  const when = l.visit_timing_type === 'flexible' ? fmtWindow(l) : fmtVisit(l.visit)
+  return (
+    <div className="flex flex-col gap-1">
+      {confirmed && (
+        <span className="pill" style={{ background: '#d6efd6', color: '#2e7d32' }}>
+          ✓ Confirmed
+        </span>
+      )}
+      {when ? (
+        <span>{when}</span>
+      ) : confirmed ? (
+        <span className="hint">time TBD</span>
+      ) : (
+        <span className="muted">-</span>
+      )}
+    </div>
+  )
+}
+
 export default function ListingsTable({
   listings,
   canEdit,
@@ -135,7 +165,6 @@ function Row({ l, canEdit, onDelete }) {
   const stop = (e) => e.stopPropagation()
   const commutes = Array.isArray(l.commutes) ? l.commutes.filter((c) => c.mapsUrl) : []
   const mediaCount = Array.isArray(l.media) ? l.media.length : 0
-  const visit = fmtVisit(l.visit)
 
   return (
     <tr className="cursor-pointer align-top hover:bg-paper" onClick={go}>
@@ -150,7 +179,9 @@ function Row({ l, canEdit, onDelete }) {
         </span>
       </td>
       <td className="border-b border-line px-3 py-3">{l.location || '-'}</td>
-      <td className="border-b border-line px-3 py-3">{visit || <span className="muted">-</span>}</td>
+      <td className="border-b border-line px-3 py-3">
+        <VisitCell l={l} />
+      </td>
       <td className="border-b border-line px-3 py-3">
         {commutes.length ? (
           <div className="flex flex-col gap-1" onClick={stop}>

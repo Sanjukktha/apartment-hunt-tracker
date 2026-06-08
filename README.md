@@ -10,6 +10,7 @@ I built it for my own move and then generalized it so anyone can use it for any 
 - **Commute links, built for you.** During setup you list up to three places you want to be close to (an office, a partner's work, a gym). Every listing then gets a one-click Google Maps directions link from the apartment to each place, with the travel mode pre-filled. No Google API and no cost: it is just a deep link into Maps.
 - **Auto distance and time.** For drive, walk, and cycle, the app fills in the distance and time using OpenRouteService (free, no credit card). Public transit is not auto-filled (OpenRouteService has no transit engine), so for transit you open the Maps link, see the exact route, and type the time in. The link is still built for you.
 - **Photos and videos by link.** Paste a link (Google Drive, Google Photos, Imgur, the listing page). The detail page shows images in a gallery and plays videos. Links keep storage free.
+- **Visit planning.** Mark a listing "Visit confirmed" with either a specific time or a flexible window. The Visitations tab collects them all, and a schedule generator clusters confirmed visits by real distance (not by area name), respects your fixed times and windows, and suggests an efficient order per group with a clickable Google Maps walking route.
 - **Excel export.** One click produces an .xlsx. The commute cells link to the Maps routes, and the media cell links back to that listing's page on the live site, since a spreadsheet cannot hold real images.
 - **Local first, share when ready.** With no setup it runs entirely in your browser (localStorage). Add Supabase keys and you can flip a switch to go remote, which copies your local listings up and gives you a link to share. Viewing the shared link is open to anyone; adding or editing requires a quick Google sign-in.
 
@@ -45,7 +46,7 @@ All configuration is environment variables. See `.env.example`.
 ### Supabase (cloud sharing and sign-in)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. In the SQL Editor, run the contents of `supabase-schema.sql`.
+2. In the SQL Editor, run the contents of `supabase-schema.sql`. If you set up your database from an earlier version of this file, also run `supabase-migration-visits.sql` to add the visit planning columns.
 3. Enable Google as an auth provider: Authentication > Providers > Google. Add your site URL to the allowed redirect URLs.
 4. Copy the Project URL and anon key (Project Settings > API) into `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
