@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { computeRoute, geocodeMany } from './api/_ors.js'
+import { findNearestTransit } from './api/_transit.js'
 
 // In production the /api/* endpoints are Vercel serverless functions. During
 // `vite dev` there is no Vercel runtime, so this plugin serves the same logic as
@@ -47,6 +48,12 @@ function devApi(env) {
         '/api/geocode',
         handle(async (body, env) => ({
           results: await geocodeMany(body.addresses || [], env.ORS_API_KEY),
+        })),
+      )
+      server.middlewares.use(
+        '/api/transit',
+        handle(async (body) => ({
+          station: await findNearestTransit(Number(body.lat), Number(body.lng), body.radiusM ? Number(body.radiusM) : undefined),
         })),
       )
     },

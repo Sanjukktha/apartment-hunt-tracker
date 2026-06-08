@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { geocodeMany } from '../lib/geocode.js'
 import { generateSchedule } from '../lib/scheduler.js'
+import { findTransit } from '../lib/transit.js'
 
 const GROUP_OPTIONS = [
   { km: 1.6, label: 'Walkable (about 1 mile)' },
@@ -8,6 +9,10 @@ const GROUP_OPTIONS = [
   { km: 4.0, label: 'Wider area (about 2.5 miles)' },
   { km: 8.0, label: 'Whole side of town (about 5 miles)' },
 ]
+
+// Max walking time between stops in a group. Anything beyond your pick splits
+// into a separate group, so a 30 min cap never asks you to walk 45.
+const WALK_OPTIONS = [10, 15, 20, 30, 45]
 
 function fmtDT(v) {
   const d = new Date(v)
@@ -39,6 +44,8 @@ export default function Visitations({ listings, base }) {
   const [groupMode, setGroupMode] = useState('radius')
   const [thresholdKm, setThresholdKm] = useState(2.4)
   const [groupCount, setGroupCount] = useState(3)
+  const [walkMin, setWalkMin] = useState(20)
+  const [transitAnchor, setTransitAnchor] = useState(true)
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -58,7 +65,14 @@ export default function Visitations({ listings, base }) {
         if (r.lat != null && r.lng != null) items.push({ ...l, lat: r.lat, lng: r.lng })
         else ungeocoded.push({ listing: l, error: r.error })
       })
-      const sched = generateSchedule(items, { mode: groupMode, thresholdKm, groupCount })
+      const sched = await generateSchedule(items, {
+        mode: groupMode,
+        thresholdKm,
+        groupCount,
+        walkMin,
+        transitAnchor,
+        findTransit,
+      })
       setResult({ ...sched, ungeocoded, missing })
     } catch (e) {
       setErr(e.message || 'Could not generate the schedule')
@@ -98,14 +112,15 @@ export default function Visitations({ listings, base }) {
               <span className="flex-1" />
               <label className="hint">Group by</label>
               <select
-                className="input max-w-[170px]"
+                className="input max-w-[180px]"
                 value={groupMode}
                 onChange={(e) => setGroupMode(e.target.value)}
               >
                 <option value="radius">Distance</option>
+                <option value="walk">Walk time</option>
                 <option value="count">Number of groups</option>
               </select>
-              {groupMode === 'radius' ? (
+              {groupMode === 'radius' && (
                 <select
                   className="input max-w-[260px]"
                   value={thresholdKm}
@@ -117,7 +132,21 @@ export default function Visitations({ listings, base }) {
                     </option>
                   ))}
                 </select>
-              ) : (
+              )}
+              {groupMode === 'walk' && (
+                <select
+                  className="input max-w-[200px]"
+                  value={walkMin}
+                  onChange={(e) => setWalkMin(Number(e.target.value))}
+                >
+                  {WALK_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      Up to {m} min walk
+                    </option>
+                  ))}
+                </select>
+              )}
+              {groupMode === 'count' && (
                 <select
                   className="input max-w-[150px]"
                   value={groupCount}
@@ -130,6 +159,14 @@ export default function Visitations({ listings, base }) {
                   ))}
                 </select>
               )}
+              <label className="hint flex cursor-pointer items-center gap-1.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={transitAnchor}
+                  onChange={(e) => setTransitAnchor(e.target.checked)}
+                />
+                Start from a transit stop
+              </label>
               <button className="btn btn-primary" onClick={generate} disabled={loading}>
                 {loading ? 'Generating...' : 'Generate schedule'}
               </button>
@@ -212,29 +249,53 @@ function ScheduleResult({ result, base }) {
               </div>
             )}
 
+            {g.transitNote && <p className="hint mt-2 text-[13px]">{g.transitNote}</p>}
+
             <ol className="mt-3 flex flex-col gap-2">
-              {g.stops.map((s, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="font-display mt-0.5 text-[15px] font-semibold text-terra">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1 border-b border-line pb-2">
-                    <a
-                      href={`#${base}/id=` + encodeURIComponent(s.listing.id)}
-                      className="font-semibold text-ink no-underline hover:text-terra"
-                    >
-                      {s.listing.address || s.listing.location || 'Untitled'}
-                    </a>
-                    <div className="hint mt-0.5">{timingLabel(s.listing)}</div>
-                    {s.travelFromPrev && (
-                      <div className="muted mt-0.5 text-[12.5px]">
-                        about {s.travelFromPrev.miles} mi, {s.travelFromPrev.min} min walk from the
-                        previous stop
-                      </div>
-                    )}
-                  </div>
-                </li>
-              ))}
+              {g.stops.map((s, i) =>
+                s.transit ? (
+                  <li key={i} className="flex gap-3">
+                    <span className="font-display mt-0.5 text-[15px] font-semibold text-terra">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 border-b border-line pb-2">
+                      <a
+                        href={
+                          'https://www.google.com/maps/search/?api=1&query=' +
+                          encodeURIComponent(`${s.lat},${s.lng}`)
+                        }
+                        target="_blank"
+                        rel="noopener"
+                        className="font-semibold text-ink no-underline hover:text-terra"
+                      >
+                        Start: {s.name}
+                      </a>
+                      <div className="hint mt-0.5">{s.kindLabel} · public transit start</div>
+                    </div>
+                  </li>
+                ) : (
+                  <li key={i} className="flex gap-3">
+                    <span className="font-display mt-0.5 text-[15px] font-semibold text-terra">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 border-b border-line pb-2">
+                      <a
+                        href={`#${base}/id=` + encodeURIComponent(s.listing.id)}
+                        className="font-semibold text-ink no-underline hover:text-terra"
+                      >
+                        {s.listing.address || s.listing.location || 'Untitled'}
+                      </a>
+                      <div className="hint mt-0.5">{timingLabel(s.listing)}</div>
+                      {s.travelFromPrev && (
+                        <div className="muted mt-0.5 text-[12.5px]">
+                          about {s.travelFromPrev.miles} mi, {s.travelFromPrev.min} min walk from the
+                          previous stop
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ),
+              )}
             </ol>
           </div>
         ))}

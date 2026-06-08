@@ -1,4 +1,4 @@
-import { haversineKm, kmToMiles, walkMinutes } from './geo.js'
+import { haversineKm, kmToMiles, walkMinutes, walkKmForMinutes, STREET_FACTOR } from './geo.js'
 
 // Turns a confirmed listing's timing fields into a normalized shape.
 //  fixed  -> a specific moment
@@ -148,16 +148,24 @@ function mostCommon(values) {
   return best
 }
 
-// A clickable Google Maps walking route through the group's ordered stops.
-function groupMapsUrl(orderedListings) {
-  const addrs = orderedListings.map((l) => l.address).filter(Boolean)
-  if (addrs.length === 0) return ''
-  if (addrs.length === 1) {
-    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addrs[0])
+// One Google Maps token per stop: a transit anchor uses its coordinates (more
+// reliable than a station name), a listing uses its street address.
+function stopToken(s) {
+  if (s.transit) return `${s.lat},${s.lng}`
+  return s.listing?.address || ''
+}
+
+// A clickable Google Maps walking route through the group's ordered stops,
+// including the transit anchor as the origin when one is present.
+function groupMapsUrl(orderedStops) {
+  const tokens = orderedStops.map(stopToken).filter(Boolean)
+  if (tokens.length === 0) return ''
+  if (tokens.length === 1) {
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(tokens[0])
   }
-  const origin = encodeURIComponent(addrs[0])
-  const destination = encodeURIComponent(addrs[addrs.length - 1])
-  const waypoints = addrs.slice(1, -1).map(encodeURIComponent).join('%7C') // %7C is the pipe
+  const origin = encodeURIComponent(tokens[0])
+  const destination = encodeURIComponent(tokens[tokens.length - 1])
+  const waypoints = tokens.slice(1, -1).map(encodeURIComponent).join('%7C') // %7C is the pipe
   let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`
   if (waypoints) url += `&waypoints=${waypoints}`
   return url
@@ -167,11 +175,29 @@ function fmtDate(d) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+// A walking leg between two { lat, lng } points, with the street factor applied.
+function walkLeg(from, to) {
+  const km = haversineKm(from, to) * STREET_FACTOR
+  return {
+    km: Math.round(km * 10) / 10,
+    miles: Math.round(kmToMiles(km) * 10) / 10,
+    min: walkMinutes(km),
+  }
+}
+
 // items: confirmed listings already geocoded as { ...listing, lat, lng }.
-export function generateSchedule(items, options = {}) {
-  const mode = options.mode === 'count' ? 'count' : 'radius'
-  const thresholdKm = options.thresholdKm || 2.4
+// When options.transitAnchor is set, options.findTransit(lat, lng) is awaited
+// per group to prepend the nearest station as the first stop.
+export async function generateSchedule(items, options = {}) {
+  let mode = 'radius'
+  if (options.mode === 'count') mode = 'count'
+  else if (options.mode === 'walk') mode = 'walk'
+
   const groupCount = options.groupCount || 3
+  const walkMin = options.walkMin || 20
+  // Walk mode is radius clustering with the radius derived from a max walk time.
+  const thresholdKm =
+    mode === 'walk' ? walkKmForMinutes(walkMin) : options.thresholdKm || 2.4
 
   const stops = items.map((l) => ({
     listing: l,
@@ -190,15 +216,7 @@ export function generateSchedule(items, options = {}) {
 
     // Travel legs between consecutive stops.
     const stopOut = ordered.map((s, i) => {
-      let travelFromPrev = null
-      if (i > 0) {
-        const km = haversineKm(ordered[i - 1], s) * 1.3 // rough street factor
-        travelFromPrev = {
-          km: Math.round(km * 10) / 10,
-          miles: Math.round(kmToMiles(km) * 10) / 10,
-          min: walkMinutes(km),
-        }
-      }
+      const travelFromPrev = i > 0 ? walkLeg(ordered[i - 1], s) : null
       return { ...s, travelFromPrev }
     })
 
@@ -231,14 +249,48 @@ export function generateSchedule(items, options = {}) {
       area,
       dates,
       earliest,
-      mapsUrl: groupMapsUrl(ordered.map((s) => s.listing)),
+      mapsUrl: groupMapsUrl(stopOut),
       stops: stopOut,
       warnings,
     }
   })
 
+  // Optionally anchor each group to public transit: arrive at the station
+  // nearest the first apartment, then walk the rest. Looked up in parallel.
+  if (options.transitAnchor && typeof options.findTransit === 'function') {
+    await Promise.all(
+      groups.map(async (g) => {
+        const first = g.stops[0]
+        if (!first) return
+        let station = null
+        try {
+          station = await options.findTransit(first.lat, first.lng)
+        } catch {
+          station = null
+        }
+        if (!station) {
+          g.transitNote = 'No nearby transit stop found; starting from the first apartment.'
+          return
+        }
+        const transitStop = {
+          transit: true,
+          name: station.name,
+          kind: station.kind,
+          kindLabel: station.kindLabel,
+          lat: station.lat,
+          lng: station.lng,
+          travelFromPrev: null,
+        }
+        // The first apartment is now reached on foot from the station.
+        first.travelFromPrev = walkLeg(transitStop, first)
+        g.stops = [transitStop, ...g.stops]
+        g.mapsUrl = groupMapsUrl(g.stops)
+      }),
+    )
+  }
+
   // Groups with the earliest commitments first; open-only groups last.
   groups.sort((a, b) => a.earliest - b.earliest)
 
-  return { mode, thresholdKm, groupCount, groups }
+  return { mode, thresholdKm, groupCount, walkMin, transitAnchored: !!options.transitAnchor, groups }
 }

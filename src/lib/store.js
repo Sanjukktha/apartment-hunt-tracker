@@ -46,11 +46,26 @@ export async function listHunts() {
     const { data, error } = await supabase
       .from('hunts')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: true })
     if (error) throw error
     return data || []
   }
-  return readLS(LS_HUNTS)
+  return readLS(LS_HUNTS).filter((h) => !h.deleted_at)
+}
+
+// Soft-deleted hunts (the Trash), most recently deleted first.
+export async function listDeletedHunts() {
+  if (isRemote()) {
+    const { data, error } = await supabase
+      .from('hunts')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  }
+  return readLS(LS_HUNTS).filter((h) => h.deleted_at)
 }
 
 export async function createHunt({ name, prefs }) {
@@ -88,8 +103,41 @@ export async function updateHunt(id, patch) {
   return null
 }
 
+// Soft delete: move the whole hunt to Trash (recoverable). Its listings stay
+// attached untouched and reappear when the hunt is restored.
 export async function deleteHunt(id) {
   if (isRemote()) {
+    const { error } = await supabase.from('hunts').update({ deleted_at: nowIso() }).eq('id', id)
+    if (error) throw error
+    return
+  }
+  const hunts = readLS(LS_HUNTS)
+  const i = hunts.findIndex((h) => h.id === id)
+  if (i > -1) {
+    hunts[i] = { ...hunts[i], deleted_at: nowIso() }
+    writeLS(LS_HUNTS, hunts)
+  }
+}
+
+// Bring a trashed hunt back, listings and all.
+export async function restoreHunt(id) {
+  if (isRemote()) {
+    const { error } = await supabase.from('hunts').update({ deleted_at: null }).eq('id', id)
+    if (error) throw error
+    return
+  }
+  const hunts = readLS(LS_HUNTS)
+  const i = hunts.findIndex((h) => h.id === id)
+  if (i > -1) {
+    hunts[i] = { ...hunts[i], deleted_at: null }
+    writeLS(LS_HUNTS, hunts)
+  }
+}
+
+// Permanently remove a hunt and everything in it (only from the Trash view).
+export async function purgeHunt(id) {
+  if (isRemote()) {
+    // Listings cascade-delete via the hunt_id foreign key.
     const { error } = await supabase.from('hunts').delete().eq('id', id)
     if (error) throw error
     return

@@ -55,7 +55,11 @@ export default function HuntView({
   }
 
   function remove() {
-    if (window.confirm(`Delete "${hunt.name}" and all its listings? This cannot be undone.`)) {
+    if (
+      window.confirm(
+        `Move "${hunt.name}" and all its listings to Trash? You can restore it from the dashboard.`,
+      )
+    ) {
       onDeleteHunt()
     }
   }

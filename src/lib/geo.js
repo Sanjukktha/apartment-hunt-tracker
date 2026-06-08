@@ -20,7 +20,20 @@ export function kmToMiles(km) {
   return km * 0.621371
 }
 
+// Streets are not straight, so real walking distance is longer than the
+// straight-line (haversine) distance. We scale by this factor everywhere we
+// turn a haversine gap into a walking estimate so the numbers stay consistent.
+export const STREET_FACTOR = 1.3
+
 // Rough walking time at 5 km/h.
 export function walkMinutes(km) {
   return Math.round((km / 5) * 60)
+}
+
+// Inverse of walkMinutes, for grouping by a maximum walk time. Returns the
+// straight-line (haversine) distance whose street-adjusted walk takes `min`
+// minutes, so it can be compared against raw haversine gaps in clustering.
+export function walkKmForMinutes(min) {
+  const walkKm = (min / 60) * 5 // distance actually walked
+  return walkKm / STREET_FACTOR // straight-line equivalent
 }

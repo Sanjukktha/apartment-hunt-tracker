@@ -3,9 +3,18 @@ import { navigate } from '../hooks/useHashRoute.js'
 
 // The signed-in home. Shows roll-up analytics and the user's hunts, and lets
 // them start a new hunt.
-export default function Dashboard({ hunts, summary, onCreateHunt, busy }) {
+export default function Dashboard({
+  hunts,
+  deletedHunts = [],
+  summary,
+  onCreateHunt,
+  onRestoreHunt,
+  onPurgeHunt,
+  busy,
+}) {
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
+  const [showTrash, setShowTrash] = useState(false)
 
   const totals = hunts.reduce(
     (acc, h) => {
@@ -98,6 +107,44 @@ export default function Dashboard({ hunts, summary, onCreateHunt, busy }) {
               </button>
             )
           })}
+        </div>
+      )}
+
+      {deletedHunts.length > 0 && (
+        <div className="mt-8">
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowTrash((v) => !v)}
+            aria-expanded={showTrash}
+          >
+            {showTrash ? 'Hide' : 'Show'} Trash ({deletedHunts.length})
+          </button>
+          {showTrash && (
+            <div className="mt-3">
+              <p className="hint mb-3">
+                Deleted hunts. Restore brings a hunt back with all its listings. Delete permanently
+                cannot be undone.
+              </p>
+              <div className="flex flex-col gap-2">
+                {deletedHunts.map((h) => (
+                  <div key={h.id} className="card flex flex-wrap items-center gap-3 p-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold">{h.name}</div>
+                      {Array.isArray(h.prefs?.searchAreas) && h.prefs.searchAreas.length > 0 && (
+                        <div className="hint truncate">{h.prefs.searchAreas.join(', ')}</div>
+                      )}
+                    </div>
+                    <button className="btn btn-teal" onClick={() => onRestoreHunt(h)} disabled={busy}>
+                      Restore
+                    </button>
+                    <button className="btn btn-ghost" onClick={() => onPurgeHunt(h)} disabled={busy}>
+                      Delete permanently
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

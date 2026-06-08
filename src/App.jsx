@@ -6,6 +6,9 @@ import {
   createHunt,
   updateHunt,
   deleteHunt,
+  listDeletedHunts,
+  restoreHunt,
+  purgeHunt,
   listListings,
   listDeletedListings,
   upsertListing,
@@ -43,6 +46,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [authReady, setAuthReady] = useState(!cloud)
   const [hunts, setHunts] = useState([])
+  const [deletedHunts, setDeletedHunts] = useState([])
   const [summary, setSummary] = useState({})
   const [listings, setListings] = useState([])
   const [deleted, setDeleted] = useState([])
@@ -73,11 +77,13 @@ export default function App() {
   const loadHunts = useCallback(async () => {
     if (!signedIn) {
       setHunts([])
+      setDeletedHunts([])
       setSummary({})
       return
     }
-    const [hs, lite] = await Promise.all([listHunts(), allListingsLite()])
+    const [hs, lite, del] = await Promise.all([listHunts(), allListingsLite(), listDeletedHunts()])
     setHunts(hs)
+    setDeletedHunts(del)
     setSummary(buildSummary(hs, lite))
   }, [signedIn])
 
@@ -297,6 +303,34 @@ export default function App() {
     }
   }, [currentHunt, loadHunts])
 
+  const handleRestoreHunt = useCallback(
+    async (h) => {
+      try {
+        await restoreHunt(h.id)
+        await loadHunts()
+      } catch (e) {
+        setError(e.message || 'Could not restore the hunt')
+      }
+    },
+    [loadHunts],
+  )
+
+  const handlePurgeHunt = useCallback(
+    async (h) => {
+      if (
+        !window.confirm(`Permanently delete "${h.name}" and all its listings? This cannot be undone.`)
+      )
+        return
+      try {
+        await purgeHunt(h.id)
+        await loadHunts()
+      } catch (e) {
+        setError(e.message || 'Could not delete the hunt permanently')
+      }
+    },
+    [loadHunts],
+  )
+
   const handleSignOut = useCallback(async () => {
     await signOut()
     setUser(null)
@@ -328,7 +362,15 @@ export default function App() {
       )}
 
       {route.name === 'dashboard' && (
-        <Dashboard hunts={hunts} summary={summary} onCreateHunt={handleCreateHunt} busy={busy} />
+        <Dashboard
+          hunts={hunts}
+          deletedHunts={deletedHunts}
+          summary={summary}
+          onCreateHunt={handleCreateHunt}
+          onRestoreHunt={handleRestoreHunt}
+          onPurgeHunt={handlePurgeHunt}
+          busy={busy}
+        />
       )}
 
       {route.name === 'hunt' &&
