@@ -36,7 +36,9 @@ function timingLabel(l) {
 
 export default function Visitations({ listings, base }) {
   const confirmed = useMemo(() => listings.filter((l) => l.visit_confirmed), [listings])
+  const [groupMode, setGroupMode] = useState('radius')
   const [thresholdKm, setThresholdKm] = useState(2.4)
+  const [groupCount, setGroupCount] = useState(3)
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -56,7 +58,7 @@ export default function Visitations({ listings, base }) {
         if (r.lat != null && r.lng != null) items.push({ ...l, lat: r.lat, lng: r.lng })
         else ungeocoded.push({ listing: l, error: r.error })
       })
-      const sched = generateSchedule(items, { thresholdKm })
+      const sched = generateSchedule(items, { mode: groupMode, thresholdKm, groupCount })
       setResult({ ...sched, ungeocoded, missing })
     } catch (e) {
       setErr(e.message || 'Could not generate the schedule')
@@ -94,18 +96,40 @@ export default function Visitations({ listings, base }) {
             <div className="flex flex-wrap items-center gap-3">
               <span className="font-semibold">{confirmed.length} confirmed</span>
               <span className="flex-1" />
-              <label className="hint">Group places that are</label>
+              <label className="hint">Group by</label>
               <select
-                className="input max-w-[260px]"
-                value={thresholdKm}
-                onChange={(e) => setThresholdKm(Number(e.target.value))}
+                className="input max-w-[170px]"
+                value={groupMode}
+                onChange={(e) => setGroupMode(e.target.value)}
               >
-                {GROUP_OPTIONS.map((o) => (
-                  <option key={o.km} value={o.km}>
-                    {o.label}
-                  </option>
-                ))}
+                <option value="radius">Distance</option>
+                <option value="count">Number of groups</option>
               </select>
+              {groupMode === 'radius' ? (
+                <select
+                  className="input max-w-[260px]"
+                  value={thresholdKm}
+                  onChange={(e) => setThresholdKm(Number(e.target.value))}
+                >
+                  {GROUP_OPTIONS.map((o) => (
+                    <option key={o.km} value={o.km}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  className="input max-w-[150px]"
+                  value={groupCount}
+                  onChange={(e) => setGroupCount(Number(e.target.value))}
+                >
+                  {[2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n} groups
+                    </option>
+                  ))}
+                </select>
+              )}
               <button className="btn btn-primary" onClick={generate} disabled={loading}>
                 {loading ? 'Generating...' : 'Generate schedule'}
               </button>

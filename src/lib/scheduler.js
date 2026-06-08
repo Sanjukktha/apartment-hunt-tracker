@@ -25,33 +25,91 @@ function timeKey(timing) {
   return timing.start ? timing.start.getTime() : Infinity
 }
 
-// Single-linkage clustering: any two stops within thresholdKm are connected, and
-// connected components become groups. This groups by real distance, not by the
-// area name the user typed.
-function clusterByDistance(stops, thresholdKm) {
-  const parent = stops.map((_, i) => i)
-  const find = (x) => {
-    while (parent[x] !== x) {
-      parent[x] = parent[parent[x]]
-      x = parent[x]
+// Complete-linkage clustering: two clusters merge only if EVERY pair of stops
+// across them is within thresholdKm. This avoids the chaining problem (a string
+// of overlapping neighborhoods all collapsing into one giant group), so you get
+// tight groups where everything really is close to everything else.
+function clusterByRadius(stops, thresholdKm) {
+  const clusters = stops.map((s) => [s])
+  let merged = true
+  while (merged) {
+    merged = false
+    for (let i = 0; i < clusters.length && !merged; i++) {
+      for (let j = i + 1; j < clusters.length; j++) {
+        let maxPair = 0
+        for (const a of clusters[i]) {
+          for (const b of clusters[j]) {
+            const d = haversineKm(a, b)
+            if (d > maxPair) maxPair = d
+          }
+        }
+        if (maxPair <= thresholdKm) {
+          clusters[i] = clusters[i].concat(clusters[j])
+          clusters.splice(j, 1)
+          merged = true
+          break
+        }
+      }
     }
-    return x
   }
-  const union = (a, b) => {
-    parent[find(a)] = find(b)
+  return clusters
+}
+
+// K-means into a fixed number of groups, with deterministic farthest-first
+// seeding (no randomness) so the same input always produces the same groups.
+function clusterByCount(stops, k) {
+  k = Math.max(1, Math.min(k, stops.length))
+  if (k === 1) return [stops]
+
+  const seedIdx = [0]
+  while (seedIdx.length < k) {
+    let best = -1
+    let bestDist = -1
+    stops.forEach((s, i) => {
+      if (seedIdx.includes(i)) return
+      const nearest = Math.min(...seedIdx.map((si) => haversineKm(stops[si], s)))
+      if (nearest > bestDist) {
+        bestDist = nearest
+        best = i
+      }
+    })
+    seedIdx.push(best)
   }
-  for (let i = 0; i < stops.length; i++) {
-    for (let j = i + 1; j < stops.length; j++) {
-      if (haversineKm(stops[i], stops[j]) <= thresholdKm) union(i, j)
-    }
+
+  let centroids = seedIdx.map((i) => ({ lat: stops[i].lat, lng: stops[i].lng }))
+  const assign = new Array(stops.length).fill(0)
+
+  for (let iter = 0; iter < 25; iter++) {
+    let changed = false
+    stops.forEach((s, i) => {
+      let bestC = 0
+      let bestD = Infinity
+      centroids.forEach((c, ci) => {
+        const d = haversineKm(c, s)
+        if (d < bestD) {
+          bestD = d
+          bestC = ci
+        }
+      })
+      if (assign[i] !== bestC) {
+        assign[i] = bestC
+        changed = true
+      }
+    })
+    centroids = centroids.map((c, ci) => {
+      const members = stops.filter((_, i) => assign[i] === ci)
+      if (!members.length) return c
+      return {
+        lat: members.reduce((sum, m) => sum + m.lat, 0) / members.length,
+        lng: members.reduce((sum, m) => sum + m.lng, 0) / members.length,
+      }
+    })
+    if (!changed) break
   }
-  const groups = new Map()
-  stops.forEach((s, i) => {
-    const root = find(i)
-    if (!groups.has(root)) groups.set(root, [])
-    groups.get(root).push(s)
-  })
-  return Array.from(groups.values())
+
+  const groups = Array.from({ length: k }, () => [])
+  stops.forEach((s, i) => groups[assign[i]].push(s))
+  return groups.filter((g) => g.length)
 }
 
 // Order within a group: timed stops first in chronological order, then any
@@ -111,7 +169,9 @@ function fmtDate(d) {
 
 // items: confirmed listings already geocoded as { ...listing, lat, lng }.
 export function generateSchedule(items, options = {}) {
-  const thresholdKm = options.thresholdKm || 2
+  const mode = options.mode === 'count' ? 'count' : 'radius'
+  const thresholdKm = options.thresholdKm || 2.4
+  const groupCount = options.groupCount || 3
 
   const stops = items.map((l) => ({
     listing: l,
@@ -122,7 +182,8 @@ export function generateSchedule(items, options = {}) {
     timing: normalizeTiming(l),
   }))
 
-  const rawGroups = clusterByDistance(stops, thresholdKm)
+  const rawGroups =
+    mode === 'count' ? clusterByCount(stops, groupCount) : clusterByRadius(stops, thresholdKm)
 
   const groups = rawGroups.map((groupStops, gi) => {
     const ordered = orderStops(groupStops)
@@ -179,5 +240,5 @@ export function generateSchedule(items, options = {}) {
   // Groups with the earliest commitments first; open-only groups last.
   groups.sort((a, b) => a.earliest - b.earliest)
 
-  return { thresholdKm, groups }
+  return { mode, thresholdKm, groupCount, groups }
 }
