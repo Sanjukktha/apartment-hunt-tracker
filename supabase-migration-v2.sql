@@ -86,6 +86,15 @@ drop policy if exists "Public delete" on public.listings;
 
 grant select, insert, update, delete on public.hunts, public.hunt_members, public.listings to authenticated;
 
+drop policy if exists "hunts read"   on public.hunts;
+drop policy if exists "hunts insert" on public.hunts;
+drop policy if exists "hunts update" on public.hunts;
+drop policy if exists "hunts delete" on public.hunts;
+drop policy if exists "members read"   on public.hunt_members;
+drop policy if exists "members insert" on public.hunt_members;
+drop policy if exists "members update" on public.hunt_members;
+drop policy if exists "members delete" on public.hunt_members;
+
 create policy "hunts read"   on public.hunts for select to authenticated using (public.has_hunt_access(id));
 create policy "hunts insert" on public.hunts for insert to authenticated with check (owner_id = auth.uid());
 create policy "hunts update" on public.hunts for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
