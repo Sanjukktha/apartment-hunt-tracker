@@ -18,7 +18,6 @@ import {
 import { getUser, onAuthChange, signOut, attributionFor } from './lib/auth.js'
 import { mapsUrl } from './lib/commute.js'
 import { exportListings } from './lib/excel.js'
-import Landing from './components/Landing.jsx'
 import TopBar from './components/TopBar.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import HuntView from './components/HuntView.jsx'
@@ -48,7 +47,9 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const signedIn = cloud ? !!user : true
+  // Open mode: no sign-in required. The app is always usable; the publishable
+  // key plus relaxed table policies let anyone with the link read and write.
+  const signedIn = true
 
   // Auth: current user plus live updates (including the redirect back from Google).
   useEffect(() => {
@@ -108,7 +109,7 @@ export default function App() {
     }
   }, [route.name, route.huntId, signedIn, loadHuntData])
 
-  const isOwner = currentHunt ? (cloud ? currentHunt.owner_id === user?.id : true) : false
+  const isOwner = !!currentHunt
 
   // ---- handlers ----
 
@@ -269,10 +270,6 @@ export default function App() {
 
   if (cloud && !authReady) {
     return <div className="px-[clamp(14px,4vw,44px)] pt-12 text-ink-soft">Loading...</div>
-  }
-
-  if (cloud && !user) {
-    return <Landing />
   }
 
   return (

@@ -68,9 +68,6 @@ export default function HuntView({
           Visitations
         </Tab>
         <span className="flex-1" />
-        <a href={`#${base}/members`} className="btn btn-ghost no-underline">
-          Members{memberCount ? ` (${memberCount})` : ''}
-        </a>
         <a href={`#${base}/setup`} className="btn btn-ghost no-underline">
           Edit setup
         </a>
