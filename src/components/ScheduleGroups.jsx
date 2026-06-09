@@ -105,6 +105,27 @@ export default function ScheduleGroups({ groups, base, startIndex = 0, editable 
                       Start: {s.name}
                     </a>
                     <div className="hint mt-0.5">{s.kindLabel} · public transit start</div>
+                    {s.directions && (
+                      <div className="muted mt-1 text-[12.5px]">
+                        <div className="font-medium text-ink-soft">
+                          From your place: ~{s.directions.durationMin} min
+                          {s.directions.transfers > 0
+                            ? ` · ${s.directions.transfers} transfer${s.directions.transfers > 1 ? 's' : ''}`
+                            : ' · no transfers'}
+                        </div>
+                        {Array.isArray(s.directions.legs) && s.directions.legs.length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                            {s.directions.legs.map((leg, li) => (
+                              <span key={li}>
+                                {leg.icon} {leg.label}
+                                {leg.to ? ` → ${leg.to}` : ''}
+                                {li < s.directions.legs.length - 1 ? ' ·' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {s.fromHomeUrl && (
                       <a
                         href={s.fromHomeUrl}
@@ -112,7 +133,7 @@ export default function ScheduleGroups({ groups, base, startIndex = 0, editable 
                         rel="noopener"
                         className="link-chip mt-1 inline-block no-underline"
                       >
-                        Transit directions from your place
+                        {s.directions ? 'Open full directions in Maps' : 'Transit directions from your place'}
                       </a>
                     )}
                   </div>

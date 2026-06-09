@@ -27,9 +27,11 @@ import {
   newId,
 } from './lib/store.js'
 import { getUser, onAuthChange, signOut, attributionFor } from './lib/auth.js'
+import { gateEnabled, getRole, setRole as persistRole, clearRole } from './lib/access.js'
 import { mapsUrl } from './lib/commute.js'
 import { exportListings } from './lib/excel.js'
 import TopBar from './components/TopBar.jsx'
+import Gate from './components/Gate.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import HuntView from './components/HuntView.jsx'
 
@@ -38,8 +40,9 @@ function buildSummary(hunts, lite) {
   for (const h of hunts) sum[h.id] = { leads: 0, confirmed: 0 }
   for (const l of lite) {
     if (!sum[l.hunt_id]) continue
+    if (l.struck) continue // struck leads are parked; don't count them anywhere
     sum[l.hunt_id].leads += 1
-    if (l.visit_confirmed && !l.struck) sum[l.hunt_id].confirmed += 1
+    if (l.visit_confirmed) sum[l.hunt_id].confirmed += 1
   }
   return sum
 }
@@ -60,6 +63,18 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  // Site-wide soft gate. role: '' (not chosen), 'editor', or 'viewer'.
+  const [role, setRole] = useState(getRole())
+  const canEdit = !gateEnabled() || role === 'editor'
+  const unlock = useCallback((r) => {
+    persistRole(r)
+    setRole(r)
+  }, [])
+  const lock = useCallback(() => {
+    clearRole()
+    setRole('')
+  }, [])
 
   // Open mode: no sign-in required. The app is always usable; the publishable
   // key plus relaxed table policies let anyone with the link read and write.
@@ -132,7 +147,7 @@ export default function App() {
     }
   }, [route.name, route.huntId, signedIn, loadHuntData])
 
-  const isOwner = !!currentHunt
+  const isOwner = !!currentHunt && canEdit
 
   // ---- handlers ----
 
@@ -401,6 +416,11 @@ export default function App() {
 
   // ---- render ----
 
+  // Soft gate: until a mode is chosen, show the access screen instead of the app.
+  if (gateEnabled() && !role) {
+    return <Gate onUnlock={unlock} />
+  }
+
   if (cloud && !authReady) {
     return <div className="px-[clamp(14px,4vw,44px)] pt-12 text-ink-soft">Loading...</div>
   }
@@ -412,6 +432,9 @@ export default function App() {
         cloudAvailable={cloud}
         crumb={currentHunt ? currentHunt.name : null}
         onSignOut={handleSignOut}
+        gated={gateEnabled()}
+        canEdit={canEdit}
+        onLock={lock}
       />
 
       {error && (
@@ -428,6 +451,7 @@ export default function App() {
           hunts={hunts}
           deletedHunts={deletedHunts}
           summary={summary}
+          canEdit={canEdit}
           onCreateHunt={handleCreateHunt}
           onRestoreHunt={handleRestoreHunt}
           onPurgeHunt={handlePurgeHunt}
@@ -445,6 +469,7 @@ export default function App() {
             listingId={route.listingId}
             scheduleId={route.scheduleId}
             schedules={schedules}
+            canEdit={canEdit}
             isOwner={isOwner}
             members={members}
             memberCount={members.length}

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { geocodeMany } from '../lib/geocode.js'
 import { generateSchedule } from '../lib/scheduler.js'
 import { findTransitMany } from '../lib/transit.js'
+import { transitDirectionsMany } from '../lib/directions.js'
 import ScheduleGroups, { timingLabel } from './ScheduleGroups.jsx'
 
 const GROUP_OPTIONS = [
@@ -65,6 +66,7 @@ function serializeSchedule(result) {
               lat: s.lat,
               lng: s.lng,
               fromHomeUrl: s.fromHomeUrl || null,
+              directions: s.directions || null,
               travelFromPrev: s.travelFromPrev || null,
             }
           : { travelFromPrev: s.travelFromPrev || null, listing: slimListing(s.listing) },
@@ -73,7 +75,7 @@ function serializeSchedule(result) {
   }
 }
 
-export default function Visitations({ listings, base, onSaveSchedule }) {
+export default function Visitations({ listings, base, canEdit = true, onSaveSchedule }) {
   const confirmed = useMemo(
     () => listings.filter((l) => l.visit_confirmed && !l.struck),
     [listings],
@@ -112,6 +114,25 @@ export default function Visitations({ listings, base, onSaveSchedule }) {
         origin: origin.trim() || null,
         findTransitMany,
       })
+      // Attach inline transit directions from the base address to each
+      // subsection's start station (best effort; null entries fall back to the link).
+      if (origin.trim() && transitAnchor) {
+        const anchors = []
+        const points = []
+        for (const g of sched.groups) {
+          const ts = g.stops.find((s) => s.transit && s.lat != null && s.lng != null)
+          if (ts) {
+            anchors.push(ts)
+            points.push({ lat: ts.lat, lng: ts.lng })
+          }
+        }
+        if (points.length) {
+          const dirs = await transitDirectionsMany(origin.trim(), points)
+          dirs.forEach((d, i) => {
+            if (d) anchors[i].directions = d
+          })
+        }
+      }
       setResult({ ...sched, ungeocoded, missing })
     } catch (e) {
       setErr(e.message || 'Could not generate the schedule')
@@ -148,6 +169,13 @@ export default function Visitations({ listings, base, onSaveSchedule }) {
         </div>
       ) : (
         <>
+          {!canEdit && (
+            <p className="hint mt-4">
+              Generating schedules is locked in view-only mode. Open the Schedules tab to see saved
+              ones, or enter the access code to generate.
+            </p>
+          )}
+          {canEdit && (
           <div className="card mt-5 p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <label className="hint whitespace-nowrap">Starting from</label>
@@ -223,6 +251,7 @@ export default function Visitations({ listings, base, onSaveSchedule }) {
               </button>
             </div>
           </div>
+          )}
 
           {err && (
             <div

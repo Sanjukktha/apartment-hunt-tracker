@@ -44,6 +44,7 @@ All configuration is environment variables. See `.env.example`.
 | `VITE_SITE_URL` | browser | Public site URL for the Excel deep links. Falls back to the current page. |
 | `ORS_API_KEY` | server only | OpenRouteService key. Never exposed to the browser. |
 | `GOOGLE_MAPS_API_KEY` | server only | Google Places API (New) key for the "start from a transit stop" schedule anchor. Optional; falls back to OpenStreetMap when blank. |
+| `VITE_ACCESS_CODE` | browser | Site-wide access code (soft gate). When set, visitors enter it to edit, or choose "view only". Blank disables the gate. Bundled into the client, so it deters casual visitors but is not real security. |
 
 ### Supabase (cloud sharing and sign-in)
 

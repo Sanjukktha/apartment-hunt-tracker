@@ -32,7 +32,7 @@ function sortGroups(groups) {
 // One saved schedule. View mode shows the grouped route (subsections ordered by
 // any planned dates); Edit mode lets you set a visit date per subsection, which
 // reorders them by date on save. Apartment stops stay read-only on purpose.
-function SavedScheduleView({ sched, base, onUpdate, onDelete }) {
+function SavedScheduleView({ sched, base, canEdit, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -91,15 +91,19 @@ function SavedScheduleView({ sched, base, onUpdate, onDelete }) {
             </>
           ) : (
             <>
-              <button className="btn btn-teal" onClick={startEdit}>
-                Edit dates
-              </button>
+              {canEdit && (
+                <button className="btn btn-teal" onClick={startEdit}>
+                  Edit dates
+                </button>
+              )}
               <a href={`#${base}/schedules`} className="btn btn-ghost no-underline">
                 All schedules
               </a>
-              <button className="btn btn-ghost" onClick={() => onDelete(sched)}>
-                Delete
-              </button>
+              {canEdit && (
+                <button className="btn btn-ghost" onClick={() => onDelete(sched)}>
+                  Delete
+                </button>
+              )}
             </>
           )}
         </div>
@@ -126,7 +130,7 @@ function SavedScheduleView({ sched, base, onUpdate, onDelete }) {
 
 // The Schedules tab. With a scheduleId it shows that one saved schedule; without
 // one it lists them all. Each apartment links through to its full detail page.
-export default function Schedules({ schedules, base, scheduleId, onUpdate, onDelete }) {
+export default function Schedules({ schedules, base, canEdit = true, scheduleId, onUpdate, onDelete }) {
   if (scheduleId) {
     const sched = schedules.find((s) => s.id === scheduleId)
     if (!sched) {
@@ -140,7 +144,15 @@ export default function Schedules({ schedules, base, scheduleId, onUpdate, onDel
         </div>
       )
     }
-    return <SavedScheduleView sched={sched} base={base} onUpdate={onUpdate} onDelete={onDelete} />
+    return (
+      <SavedScheduleView
+        sched={sched}
+        base={base}
+        canEdit={canEdit}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
   }
 
   return (
@@ -192,9 +204,11 @@ export default function Schedules({ schedules, base, scheduleId, onUpdate, onDel
                 >
                   View
                 </a>
-                <button className="btn btn-ghost" onClick={() => onDelete(s)}>
-                  Delete
-                </button>
+                {canEdit && (
+                  <button className="btn btn-ghost" onClick={() => onDelete(s)}>
+                    Delete
+                  </button>
+                )}
               </div>
             )
           })}

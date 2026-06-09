@@ -7,6 +7,7 @@ export default function Dashboard({
   hunts,
   deletedHunts = [],
   summary,
+  canEdit = true,
   onCreateHunt,
   onRestoreHunt,
   onPurgeHunt,
@@ -54,6 +55,7 @@ export default function Dashboard({
         </div>
       </div>
 
+      {canEdit && (
       <div className="mt-6 flex items-center gap-3">
         {creating ? (
           <div className="card flex w-full max-w-[480px] items-center gap-2 p-2">
@@ -81,6 +83,7 @@ export default function Dashboard({
           </button>
         )}
       </div>
+      )}
 
       {hunts.length > 0 && (
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -110,7 +113,7 @@ export default function Dashboard({
         </div>
       )}
 
-      {deletedHunts.length > 0 && (
+      {canEdit && deletedHunts.length > 0 && (
         <div className="mt-8">
           <button
             className="btn btn-ghost"

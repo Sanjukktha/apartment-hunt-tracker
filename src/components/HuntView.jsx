@@ -18,6 +18,7 @@ export default function HuntView({
   listingId,
   scheduleId,
   schedules = [],
+  canEdit = true,
   isOwner,
   members,
   memberCount,
@@ -42,6 +43,19 @@ export default function HuntView({
   const base = 'hunt=' + hunt.id
   const byId = (id) => listings.find((l) => l.id === id)
   const needsSetup = !isPrefsComplete(prefs)
+
+  // Viewers cannot reach the add/edit/setup forms (even by typing the URL).
+  if (!canEdit && (view === 'add' || view === 'edit' || view === 'setup' || needsSetup)) {
+    return (
+      <div className="card mt-6 p-8 text-center">
+        <h3 className="font-display m-0 mb-1.5 text-[20px]">View only</h3>
+        <p className="muted">Adding and editing is locked. Enter the access code to make changes.</p>
+        <a href={`#${base}`} className="btn btn-ghost mt-4 inline-block no-underline">
+          Back to this hunt
+        </a>
+      </div>
+    )
+  }
 
   // Force setup until the hunt has its search areas and target places.
   if (view === 'setup' || needsSetup) {
@@ -85,12 +99,16 @@ export default function HuntView({
           Schedules
         </Tab>
         <span className="flex-1" />
-        <a href={`#${base}/trash`} className="btn btn-ghost no-underline">
-          Trash{deleted.length ? ` (${deleted.length})` : ''}
-        </a>
-        <a href={`#${base}/setup`} className="btn btn-ghost no-underline">
-          Edit setup
-        </a>
+        {canEdit && (
+          <>
+            <a href={`#${base}/trash`} className="btn btn-ghost no-underline">
+              Trash{deleted.length ? ` (${deleted.length})` : ''}
+            </a>
+            <a href={`#${base}/setup`} className="btn btn-ghost no-underline">
+              Edit setup
+            </a>
+          </>
+        )}
         {isOwner && (
           <>
             <button className="btn btn-ghost" onClick={rename}>
@@ -117,7 +135,7 @@ export default function HuntView({
           />
         )}
 
-        {view === 'detail' && <ListingDetail listing={byId(listingId)} canEdit base={base} />}
+        {view === 'detail' && <ListingDetail listing={byId(listingId)} canEdit={canEdit} base={base} />}
 
         {view === 'members' && (
           <Members
@@ -130,13 +148,19 @@ export default function HuntView({
         )}
 
         {view === 'visits' && (
-          <Visitations listings={listings} base={base} onSaveSchedule={onSaveSchedule} />
+          <Visitations
+            listings={listings}
+            base={base}
+            canEdit={canEdit}
+            onSaveSchedule={onSaveSchedule}
+          />
         )}
 
         {(view === 'schedules' || view === 'schedule') && (
           <Schedules
             schedules={schedules}
             base={base}
+            canEdit={canEdit}
             scheduleId={view === 'schedule' ? scheduleId : null}
             onUpdate={onUpdateSchedule}
             onDelete={onDeleteSchedule}
@@ -150,7 +174,7 @@ export default function HuntView({
         {view === 'leads' && (
           <ListingsTable
             listings={listings}
-            canEdit
+            canEdit={canEdit}
             onDelete={onDeleteListing}
             onStrike={onStrikeListing}
             onExport={onExport}

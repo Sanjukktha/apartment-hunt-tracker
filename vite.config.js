@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { computeRoute, geocodeMany } from './api/_ors.js'
 import { findNearestTransit, findNearestTransitMany } from './api/_transit.js'
+import { transitRoutesMany } from './api/_directions.js'
 
 // In production the /api/* endpoints are Vercel serverless functions. During
 // `vite dev` there is no Vercel runtime, so this plugin serves the same logic as
@@ -60,6 +61,12 @@ function devApi(env) {
           }
           return { station: await findNearestTransit(Number(body.lat), Number(body.lng), radiusM, key) }
         }),
+      )
+      server.middlewares.use(
+        '/api/directions',
+        handle(async (body, env) => ({
+          routes: await transitRoutesMany(body.origin, body.points || [], env.GOOGLE_MAPS_API_KEY),
+        })),
       )
     },
   }
