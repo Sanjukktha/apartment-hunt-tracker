@@ -18,6 +18,9 @@ import {
   listMembers,
   inviteMember,
   removeMember,
+  listSchedules,
+  createSchedule,
+  removeSchedule,
   allListingsLite,
   newId,
 } from './lib/store.js'
@@ -51,6 +54,7 @@ export default function App() {
   const [listings, setListings] = useState([])
   const [deleted, setDeleted] = useState([])
   const [members, setMembers] = useState([])
+  const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -108,14 +112,16 @@ export default function App() {
   const currentHunt = route.name === 'hunt' ? hunts.find((h) => h.id === route.huntId) : null
 
   const loadHuntData = useCallback(async (huntId) => {
-    const [ls, ms, del] = await Promise.all([
+    const [ls, ms, del, scheds] = await Promise.all([
       listListings(huntId),
       listMembers(huntId),
       listDeletedListings(huntId),
+      listSchedules(huntId),
     ])
     setListings(ls)
     setMembers(ms)
     setDeleted(del)
+    setSchedules(scheds)
   }, [])
 
   useEffect(() => {
@@ -280,6 +286,34 @@ export default function App() {
     [currentHunt],
   )
 
+  const handleSaveSchedule = useCallback(
+    async (name, data) => {
+      if (!currentHunt) return
+      try {
+        await createSchedule({ hunt_id: currentHunt.id, name, data })
+        setSchedules(await listSchedules(currentHunt.id))
+      } catch (e) {
+        setError(e.message || 'Could not save the schedule')
+      }
+    },
+    [currentHunt],
+  )
+
+  const handleDeleteSchedule = useCallback(
+    async (s) => {
+      if (!currentHunt) return
+      if (!window.confirm(`Delete the schedule "${s.name}"? This cannot be undone.`)) return
+      try {
+        await removeSchedule(s.id)
+        setSchedules(await listSchedules(currentHunt.id))
+        navigate('hunt=' + currentHunt.id + '/schedules')
+      } catch (e) {
+        setError(e.message || 'Could not delete the schedule')
+      }
+    },
+    [currentHunt],
+  )
+
   const handleRenameHunt = useCallback(
     async (name) => {
       if (!currentHunt) return
@@ -381,6 +415,8 @@ export default function App() {
             deleted={deleted}
             view={route.view}
             listingId={route.listingId}
+            scheduleId={route.scheduleId}
+            schedules={schedules}
             isOwner={isOwner}
             members={members}
             memberCount={members.length}
@@ -396,6 +432,8 @@ export default function App() {
             onRemoveMember={handleRemoveMember}
             onRenameHunt={handleRenameHunt}
             onDeleteHunt={handleDeleteHunt}
+            onSaveSchedule={handleSaveSchedule}
+            onDeleteSchedule={handleDeleteSchedule}
           />
         ) : loading ? (
           <div className="mt-10 text-ink-soft">Loading...</div>

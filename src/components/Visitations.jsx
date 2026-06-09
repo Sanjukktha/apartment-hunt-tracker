@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { geocodeMany } from '../lib/geocode.js'
 import { generateSchedule } from '../lib/scheduler.js'
-import { findTransit } from '../lib/transit.js'
+import { findTransitMany } from '../lib/transit.js'
+import ScheduleGroups, { timingLabel } from './ScheduleGroups.jsx'
 
 const GROUP_OPTIONS = [
   { km: 1.6, label: 'Walkable (about 1 mile)' },
@@ -14,32 +15,61 @@ const GROUP_OPTIONS = [
 // into a separate group, so a 30 min cap never asks you to walk 45.
 const WALK_OPTIONS = [10, 15, 20, 30, 45]
 
-function fmtDT(v) {
-  const d = new Date(v)
-  if (isNaN(d)) return v
-  return d.toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-function timingLabel(l) {
-  if (l.visit_timing_type === 'flexible') {
-    const s = l.visit_window_start ? fmtDT(l.visit_window_start) : null
-    const e = l.visit_window_end ? fmtDT(l.visit_window_end) : null
-    if (s && e) return `Flexible: ${s} to ${e}`
-    if (s) return `Flexible from ${s}`
-    if (e) return `Flexible until ${e}`
-    return 'Flexible time'
+// Trim a listing down to just what the saved-schedule view needs to display.
+// The full apartment detail is still reachable by id, so we do not duplicate it.
+function slimListing(l) {
+  return {
+    id: l.id,
+    address: l.address,
+    location: l.location,
+    type: l.type,
+    rent: l.rent,
+    visit: l.visit,
+    visit_confirmed: l.visit_confirmed,
+    visit_timing_type: l.visit_timing_type,
+    visit_window_start: l.visit_window_start,
+    visit_window_end: l.visit_window_end,
+    contact_name: l.contact_name,
+    contact_number: l.contact_number,
   }
-  if (l.visit) return fmtDT(l.visit)
-  return 'Time not set yet'
 }
 
-export default function Visitations({ listings, base }) {
+// The shape we persist for a saved schedule: enough to render the groups and
+// link each stop to its apartment, without the live-only geocoding leftovers.
+function serializeSchedule(result) {
+  return {
+    mode: result.mode,
+    walkMin: result.walkMin,
+    thresholdKm: result.thresholdKm,
+    groupCount: result.groupCount,
+    transitAnchored: result.transitAnchored,
+    groups: result.groups.map((g) => ({
+      id: g.id,
+      label: g.label,
+      area: g.area,
+      dates: g.dates,
+      earliest: g.earliest,
+      mapsUrl: g.mapsUrl,
+      warnings: g.warnings,
+      transitNote: g.transitNote || null,
+      stops: g.stops.map((s) =>
+        s.transit
+          ? {
+              transit: true,
+              name: s.name,
+              kind: s.kind,
+              kindLabel: s.kindLabel,
+              lat: s.lat,
+              lng: s.lng,
+              travelFromPrev: s.travelFromPrev || null,
+            }
+          : { travelFromPrev: s.travelFromPrev || null, listing: slimListing(s.listing) },
+      ),
+    })),
+  }
+}
+
+export default function Visitations({ listings, base, onSaveSchedule }) {
   const confirmed = useMemo(() => listings.filter((l) => l.visit_confirmed), [listings])
   const [groupMode, setGroupMode] = useState('radius')
   const [thresholdKm, setThresholdKm] = useState(2.4)
@@ -71,7 +101,7 @@ export default function Visitations({ listings, base }) {
         groupCount,
         walkMin,
         transitAnchor,
-        findTransit,
+        findTransitMany,
       })
       setResult({ ...sched, ungeocoded, missing })
     } catch (e) {
@@ -91,6 +121,9 @@ export default function Visitations({ listings, base }) {
             suggest an efficient order.
           </p>
         </div>
+        <a href={`#${base}/schedules`} className="btn btn-ghost no-underline">
+          Saved schedules
+        </a>
       </div>
 
       {confirmed.length === 0 ? (
@@ -190,7 +223,13 @@ export default function Visitations({ listings, base }) {
             </div>
           )}
 
-          {result && <ScheduleResult result={result} base={base} />}
+          {result && (
+            <ScheduleResult
+              result={result}
+              base={base}
+              onSave={(name) => onSaveSchedule(name, serializeSchedule(result))}
+            />
+          )}
         </>
       )}
     </div>
@@ -212,94 +251,46 @@ function ConfirmedCard({ l, base }) {
   )
 }
 
-function ScheduleResult({ result, base }) {
+function ScheduleResult({ result, base, onSave }) {
+  const [savedName, setSavedName] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    const def = 'Schedule ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    const name = window.prompt('Name this schedule', def)
+    if (!name || !name.trim()) return
+    setSaving(true)
+    try {
+      await onSave(name.trim())
+      setSavedName(name.trim())
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="mt-5">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="font-semibold">
           {result.groups.length} group{result.groups.length === 1 ? '' : 's'}
         </span>
         <span className="hint">Visit each group together to cut down on travel.</span>
+        <span className="flex-1" />
+        {savedName ? (
+          <span className="hint">
+            Saved as "{savedName}".{' '}
+            <a href={`#${base}/schedules`} className="link-chip no-underline">
+              View saved schedules
+            </a>
+          </span>
+        ) : (
+          <button className="btn btn-teal" onClick={save} disabled={saving}>
+            {saving ? 'Saving...' : 'Save schedule'}
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-col gap-4">
-        {result.groups.map((g, gi) => (
-          <div key={g.id} className="card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="font-display m-0 text-[18px] font-semibold">
-                  {gi + 1}. {g.label}
-                </h3>
-                {g.dates.length > 0 && <div className="hint mt-0.5">{g.dates.join(', ')}</div>}
-              </div>
-              {g.mapsUrl && (
-                <a className="link-chip no-underline" href={g.mapsUrl} target="_blank" rel="noopener">
-                  Open walking route in Maps
-                </a>
-              )}
-            </div>
-
-            {g.warnings.length > 0 && (
-              <div className="mt-3 flex flex-col gap-1">
-                {g.warnings.map((w, i) => (
-                  <p key={i} className="text-[13px] text-terra">
-                    {w}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {g.transitNote && <p className="hint mt-2 text-[13px]">{g.transitNote}</p>}
-
-            <ol className="mt-3 flex flex-col gap-2">
-              {g.stops.map((s, i) =>
-                s.transit ? (
-                  <li key={i} className="flex gap-3">
-                    <span className="font-display mt-0.5 text-[15px] font-semibold text-terra">
-                      {i + 1}
-                    </span>
-                    <div className="flex-1 border-b border-line pb-2">
-                      <a
-                        href={
-                          'https://www.google.com/maps/search/?api=1&query=' +
-                          encodeURIComponent(`${s.lat},${s.lng}`)
-                        }
-                        target="_blank"
-                        rel="noopener"
-                        className="font-semibold text-ink no-underline hover:text-terra"
-                      >
-                        Start: {s.name}
-                      </a>
-                      <div className="hint mt-0.5">{s.kindLabel} · public transit start</div>
-                    </div>
-                  </li>
-                ) : (
-                  <li key={i} className="flex gap-3">
-                    <span className="font-display mt-0.5 text-[15px] font-semibold text-terra">
-                      {i + 1}
-                    </span>
-                    <div className="flex-1 border-b border-line pb-2">
-                      <a
-                        href={`#${base}/id=` + encodeURIComponent(s.listing.id)}
-                        className="font-semibold text-ink no-underline hover:text-terra"
-                      >
-                        {s.listing.address || s.listing.location || 'Untitled'}
-                      </a>
-                      <div className="hint mt-0.5">{timingLabel(s.listing)}</div>
-                      {s.travelFromPrev && (
-                        <div className="muted mt-0.5 text-[12.5px]">
-                          about {s.travelFromPrev.miles} mi, {s.travelFromPrev.min} min walk from the
-                          previous stop
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                ),
-              )}
-            </ol>
-          </div>
-        ))}
-      </div>
+      <ScheduleGroups groups={result.groups} base={base} />
 
       {result.ungeocoded.length > 0 && (
         <div className="card mt-4 p-4">

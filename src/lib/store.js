@@ -9,6 +9,7 @@ import { supabase, cloudConfigured } from './supabase.js'
 
 const LS_HUNTS = 'apt_hunts_v2'
 const LS_LISTINGS = 'apt_listings_v2'
+const LS_SCHEDULES = 'apt_schedules_v1'
 
 export function cloudAvailable() {
   return cloudConfigured
@@ -266,6 +267,49 @@ export async function purgeListing(id) {
     return
   }
   writeLS(LS_LISTINGS, readLS(LS_LISTINGS).filter((r) => r.id !== id))
+}
+
+// ---- Saved schedules (scoped to a hunt) ----
+
+export async function listSchedules(huntId) {
+  if (isRemote()) {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('hunt_id', huntId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  }
+  return readLS(LS_SCHEDULES)
+    .filter((s) => s.hunt_id === huntId)
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+}
+
+export async function createSchedule({ hunt_id, name, data }) {
+  if (isRemote()) {
+    const { data: row, error } = await supabase
+      .from('schedules')
+      .insert({ hunt_id, name, data: data || {} })
+      .select()
+      .single()
+    if (error) throw error
+    return row
+  }
+  const row = { id: newId(), hunt_id, name, data: data || {}, created_at: nowIso() }
+  const rows = readLS(LS_SCHEDULES)
+  rows.unshift(row)
+  writeLS(LS_SCHEDULES, rows)
+  return row
+}
+
+export async function removeSchedule(id) {
+  if (isRemote()) {
+    const { error } = await supabase.from('schedules').delete().eq('id', id)
+    if (error) throw error
+    return
+  }
+  writeLS(LS_SCHEDULES, readLS(LS_SCHEDULES).filter((s) => s.id !== id))
 }
 
 // Lightweight roll-up across every hunt the user can see, for the dashboard.

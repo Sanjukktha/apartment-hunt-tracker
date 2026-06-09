@@ -43,6 +43,7 @@ All configuration is environment variables. See `.env.example`.
 | `VITE_SUPABASE_ANON_KEY` | browser | Supabase anon key. Public by design; row level security controls access. |
 | `VITE_SITE_URL` | browser | Public site URL for the Excel deep links. Falls back to the current page. |
 | `ORS_API_KEY` | server only | OpenRouteService key. Never exposed to the browser. |
+| `GOOGLE_MAPS_API_KEY` | server only | Google Places API (New) key for the "start from a transit stop" schedule anchor. Optional; falls back to OpenStreetMap when blank. |
 
 ### Supabase (cloud sharing and sign-in)
 
@@ -55,6 +56,12 @@ All configuration is environment variables. See `.env.example`.
 
 1. Sign up at [openrouteservice.org/dev](https://openrouteservice.org/dev). It is free and needs no credit card.
 2. Create a token and put it in `ORS_API_KEY`.
+
+### Google Places (transit-stop schedule anchor)
+
+1. In [Google Cloud Console](https://console.cloud.google.com), create a project and enable the **Places API (New)**.
+2. Create an API key and put it in `GOOGLE_MAPS_API_KEY`. Optionally restrict it to the Places API.
+3. Leave blank to skip it: the schedule generator then falls back to the free OpenStreetMap Overpass service, which is slower and can be rate limited.
 
 ## Deploy (Vercel)
 

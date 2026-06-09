@@ -5,6 +5,7 @@ import ListingsTable from './ListingsTable.jsx'
 import ListingForm from './ListingForm.jsx'
 import ListingDetail from './ListingDetail.jsx'
 import Visitations from './Visitations.jsx'
+import Schedules from './Schedules.jsx'
 import Members from './Members.jsx'
 
 // One hunt's world: the Leads and Visitations tabs plus setup, detail, and the
@@ -15,6 +16,8 @@ export default function HuntView({
   deleted = [],
   view,
   listingId,
+  scheduleId,
+  schedules = [],
   isOwner,
   members,
   memberCount,
@@ -30,6 +33,8 @@ export default function HuntView({
   onRemoveMember,
   onRenameHunt,
   onDeleteHunt,
+  onSaveSchedule,
+  onDeleteSchedule,
 }) {
   const prefs = hunt.prefs || {}
   const base = 'hunt=' + hunt.id
@@ -73,6 +78,9 @@ export default function HuntView({
         </Tab>
         <Tab href={`#${base}/visits`} active={view === 'visits'}>
           Visitations
+        </Tab>
+        <Tab href={`#${base}/schedules`} active={view === 'schedules' || view === 'schedule'}>
+          Schedules
         </Tab>
         <span className="flex-1" />
         <a href={`#${base}/trash`} className="btn btn-ghost no-underline">
@@ -119,7 +127,18 @@ export default function HuntView({
           />
         )}
 
-        {view === 'visits' && <Visitations listings={listings} base={base} />}
+        {view === 'visits' && (
+          <Visitations listings={listings} base={base} onSaveSchedule={onSaveSchedule} />
+        )}
+
+        {(view === 'schedules' || view === 'schedule') && (
+          <Schedules
+            schedules={schedules}
+            base={base}
+            scheduleId={view === 'schedule' ? scheduleId : null}
+            onDelete={onDeleteSchedule}
+          />
+        )}
 
         {view === 'trash' && (
           <Trash deleted={deleted} base={base} onRestore={onRestoreListing} onPurge={onPurgeListing} />

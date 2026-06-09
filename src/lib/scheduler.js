@@ -186,8 +186,8 @@ function walkLeg(from, to) {
 }
 
 // items: confirmed listings already geocoded as { ...listing, lat, lng }.
-// When options.transitAnchor is set, options.findTransit(lat, lng) is awaited
-// per group to prepend the nearest station as the first stop.
+// When options.transitAnchor is set, options.findTransitMany(points) is awaited
+// once to prepend the nearest station as the first stop of each group.
 export async function generateSchedule(items, options = {}) {
   let mode = 'radius'
   if (options.mode === 'count') mode = 'count'
@@ -256,37 +256,41 @@ export async function generateSchedule(items, options = {}) {
   })
 
   // Optionally anchor each group to public transit: arrive at the station
-  // nearest the first apartment, then walk the rest. Looked up in parallel.
-  if (options.transitAnchor && typeof options.findTransit === 'function') {
-    await Promise.all(
-      groups.map(async (g) => {
-        const first = g.stops[0]
-        if (!first) return
-        let station = null
-        try {
-          station = await options.findTransit(first.lat, first.lng)
-        } catch {
-          station = null
-        }
-        if (!station) {
-          g.transitNote = 'No nearby transit stop found; starting from the first apartment.'
-          return
-        }
-        const transitStop = {
-          transit: true,
-          name: station.name,
-          kind: station.kind,
-          kindLabel: station.kindLabel,
-          lat: station.lat,
-          lng: station.lng,
-          travelFromPrev: null,
-        }
-        // The first apartment is now reached on foot from the station.
-        first.travelFromPrev = walkLeg(transitStop, first)
-        g.stops = [transitStop, ...g.stops]
-        g.mapsUrl = groupMapsUrl(g.stops)
-      }),
-    )
+  // nearest the first apartment, then walk the rest. One batched lookup covers
+  // every group, which stays well under the public Overpass rate limits.
+  if (options.transitAnchor && typeof options.findTransitMany === 'function') {
+    const anchorPoints = groups.map((g) => {
+      const first = g.stops[0]
+      return first ? { lat: first.lat, lng: first.lng } : null
+    })
+    let stations = []
+    try {
+      stations = await options.findTransitMany(anchorPoints.map((p) => p || { lat: 0, lng: 0 }))
+    } catch {
+      stations = []
+    }
+    groups.forEach((g, gi) => {
+      const first = g.stops[0]
+      const station = anchorPoints[gi] ? stations[gi] : null
+      if (!first) return
+      if (!station) {
+        g.transitNote = 'No nearby transit stop found; starting from the first apartment.'
+        return
+      }
+      const transitStop = {
+        transit: true,
+        name: station.name,
+        kind: station.kind,
+        kindLabel: station.kindLabel,
+        lat: station.lat,
+        lng: station.lng,
+        travelFromPrev: null,
+      }
+      // The first apartment is now reached on foot from the station.
+      first.travelFromPrev = walkLeg(transitStop, first)
+      g.stops = [transitStop, ...g.stops]
+      g.mapsUrl = groupMapsUrl(g.stops)
+    })
   }
 
   // Groups with the earliest commitments first; open-only groups last.
