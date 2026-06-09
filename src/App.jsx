@@ -13,6 +13,7 @@ import {
   listDeletedListings,
   upsertListing,
   removeListing,
+  strikeListing,
   restoreListing,
   purgeListing,
   listMembers,
@@ -20,6 +21,7 @@ import {
   removeMember,
   listSchedules,
   createSchedule,
+  updateSchedule,
   removeSchedule,
   allListingsLite,
   newId,
@@ -37,7 +39,7 @@ function buildSummary(hunts, lite) {
   for (const l of lite) {
     if (!sum[l.hunt_id]) continue
     sum[l.hunt_id].leads += 1
-    if (l.visit_confirmed) sum[l.hunt_id].confirmed += 1
+    if (l.visit_confirmed && !l.struck) sum[l.hunt_id].confirmed += 1
   }
   return sum
 }
@@ -199,6 +201,19 @@ export default function App() {
     [currentHunt, loadHuntData, loadHunts],
   )
 
+  const handleStrikeListing = useCallback(
+    async (l) => {
+      if (!currentHunt) return
+      try {
+        await strikeListing(l.id, !l.struck)
+        await Promise.all([loadHuntData(currentHunt.id), loadHunts()])
+      } catch (e) {
+        setError(e.message || 'Could not update the listing')
+      }
+    },
+    [currentHunt, loadHuntData, loadHunts],
+  )
+
   const handleRestoreListing = useCallback(
     async (l) => {
       if (!currentHunt) return
@@ -294,6 +309,19 @@ export default function App() {
         setSchedules(await listSchedules(currentHunt.id))
       } catch (e) {
         setError(e.message || 'Could not save the schedule')
+      }
+    },
+    [currentHunt],
+  )
+
+  const handleUpdateSchedule = useCallback(
+    async (id, data) => {
+      if (!currentHunt) return
+      try {
+        await updateSchedule(id, { data })
+        setSchedules(await listSchedules(currentHunt.id))
+      } catch (e) {
+        setError(e.message || 'Could not update the schedule')
       }
     },
     [currentHunt],
@@ -423,6 +451,7 @@ export default function App() {
             busy={busy}
             onSaveListing={handleSaveListing}
             onDeleteListing={handleDeleteListing}
+            onStrikeListing={handleStrikeListing}
             onRestoreListing={handleRestoreListing}
             onPurgeListing={handlePurgeListing}
             onAddSample={handleAddSample}
@@ -433,6 +462,7 @@ export default function App() {
             onRenameHunt={handleRenameHunt}
             onDeleteHunt={handleDeleteHunt}
             onSaveSchedule={handleSaveSchedule}
+            onUpdateSchedule={handleUpdateSchedule}
             onDeleteSchedule={handleDeleteSchedule}
           />
         ) : loading ? (

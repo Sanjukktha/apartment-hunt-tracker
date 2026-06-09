@@ -1,5 +1,14 @@
 import { STATUS_COLORS } from '../lib/constants.js'
+import { navigate } from '../hooks/useHashRoute.js'
 import MediaGallery from './MediaGallery.jsx'
+
+// Go back to wherever the user came from (a schedule, the leads list, the visits
+// tab...) instead of always jumping to the leads list. Falls back to the hunt
+// home when there is no in-app history (e.g. opened from a deep link).
+function goBack(base) {
+  if (typeof window !== 'undefined' && window.history.length > 1) window.history.back()
+  else navigate(base)
+}
 
 function fmtVisit(v) {
   if (!v) return null
@@ -34,8 +43,11 @@ export default function ListingDetail({ listing, canEdit, base }) {
   return (
     <div className="mt-5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => goBack(base)} className="link-chip no-underline">
+          ← Back
+        </button>
         <a href={`#${base}`} className="link-chip no-underline">
-          ← All listings
+          All listings
         </a>
         {canEdit && (
           <a href={`#${base}/edit=` + encodeURIComponent(listing.id)} className="btn btn-ghost ml-auto no-underline">

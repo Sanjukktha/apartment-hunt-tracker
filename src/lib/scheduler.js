@@ -175,6 +175,18 @@ function fmtDate(d) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+// Google Maps transit directions from the user's home/base address to a group's
+// start station, so they can see which train/bus to take and where to get off.
+function transitDirectionsUrl(originAddr, station) {
+  if (!originAddr || !station) return ''
+  const dest =
+    station.lat != null && station.lng != null
+      ? `${station.lat},${station.lng}`
+      : station.mapsQuery || station.name
+  if (!dest) return ''
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originAddr)}&destination=${encodeURIComponent(dest)}&travelmode=transit`
+}
+
 // A walking leg between two { lat, lng } points, with the street factor applied.
 function walkLeg(from, to) {
   const km = haversineKm(from, to) * STREET_FACTOR
@@ -284,6 +296,8 @@ export async function generateSchedule(items, options = {}) {
         kindLabel: station.kindLabel,
         lat: station.lat,
         lng: station.lng,
+        // How to reach this station from the user's base address by transit.
+        fromHomeUrl: transitDirectionsUrl(options.origin, station),
         travelFromPrev: null,
       }
       // The first apartment is now reached on foot from the station.
@@ -296,5 +310,13 @@ export async function generateSchedule(items, options = {}) {
   // Groups with the earliest commitments first; open-only groups last.
   groups.sort((a, b) => a.earliest - b.earliest)
 
-  return { mode, thresholdKm, groupCount, walkMin, transitAnchored: !!options.transitAnchor, groups }
+  return {
+    mode,
+    thresholdKm,
+    groupCount,
+    walkMin,
+    transitAnchored: !!options.transitAnchor,
+    origin: options.origin || null,
+    groups,
+  }
 }

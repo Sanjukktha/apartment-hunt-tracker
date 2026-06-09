@@ -64,6 +64,7 @@ export default function ListingsTable({
   listings,
   canEdit,
   onDelete,
+  onStrike,
   onExport,
   onAddSample,
   base,
@@ -148,7 +149,7 @@ export default function ListingsTable({
           </thead>
           <tbody>
             {rows.map((l) => (
-              <Row key={l.id} l={l} canEdit={canEdit} onDelete={onDelete} base={base} />
+              <Row key={l.id} l={l} canEdit={canEdit} onDelete={onDelete} onStrike={onStrike} base={base} />
             ))}
           </tbody>
         </table>
@@ -168,18 +169,29 @@ export default function ListingsTable({
   )
 }
 
-function Row({ l, canEdit, onDelete, base }) {
+function Row({ l, canEdit, onDelete, onStrike, base }) {
   const go = () => navigate(`${base}/id=` + encodeURIComponent(l.id))
   const stop = (e) => e.stopPropagation()
   const commutes = Array.isArray(l.commutes) ? l.commutes.filter((c) => c.mapsUrl) : []
   const mediaCount = Array.isArray(l.media) ? l.media.length : 0
+  const struck = !!l.struck
 
   return (
-    <tr className="cursor-pointer align-top hover:bg-paper" onClick={go}>
+    <tr
+      className={`cursor-pointer align-top hover:bg-paper ${struck ? 'opacity-55' : ''}`}
+      onClick={go}
+    >
       <td className="border-b border-line px-3 py-3">
         <StatusPill status={l.status} />
       </td>
-      <td className="max-w-[200px] border-b border-line px-3 py-3 font-semibold">{l.address || '-'}</td>
+      <td className="max-w-[200px] border-b border-line px-3 py-3 font-semibold">
+        <span className={struck ? 'line-through decoration-2' : ''}>{l.address || '-'}</span>
+        {struck && (
+          <span className="ml-2 align-middle text-[10px] uppercase tracking-[0.06em] text-ink-soft no-underline">
+            struck
+          </span>
+        )}
+      </td>
       <td className="border-b border-line px-3 py-3">{l.type || '-'}</td>
       <td className="whitespace-nowrap border-b border-line px-3 py-3">
         <span className="font-display font-semibold">
@@ -252,6 +264,14 @@ function Row({ l, canEdit, onDelete, base }) {
             >
               {'✎'}
             </a>
+            <button
+              className="grid h-[30px] w-[30px] place-items-center rounded-lg border border-line text-[14px] hover:bg-terra-soft"
+              style={struck ? { background: 'var(--color-terra-soft)', color: 'var(--color-terra)' } : { background: 'var(--color-paper-2)' }}
+              title={struck ? 'Un-strike (start pursuing again)' : 'Strike (not pursuing; hide from Visitations)'}
+              onClick={() => onStrike(l)}
+            >
+              {'⊘'}
+            </button>
             <button
               className="grid h-[30px] w-[30px] place-items-center rounded-lg border border-line bg-paper-2 text-[14px] hover:bg-terra-soft"
               title="Delete"

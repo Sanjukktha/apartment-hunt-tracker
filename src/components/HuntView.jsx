@@ -24,6 +24,7 @@ export default function HuntView({
   busy,
   onSaveListing,
   onDeleteListing,
+  onStrikeListing,
   onRestoreListing,
   onPurgeListing,
   onAddSample,
@@ -34,6 +35,7 @@ export default function HuntView({
   onRenameHunt,
   onDeleteHunt,
   onSaveSchedule,
+  onUpdateSchedule,
   onDeleteSchedule,
 }) {
   const prefs = hunt.prefs || {}
@@ -136,6 +138,7 @@ export default function HuntView({
             schedules={schedules}
             base={base}
             scheduleId={view === 'schedule' ? scheduleId : null}
+            onUpdate={onUpdateSchedule}
             onDelete={onDeleteSchedule}
           />
         )}
@@ -149,6 +152,7 @@ export default function HuntView({
             listings={listings}
             canEdit
             onDelete={onDeleteListing}
+            onStrike={onStrikeListing}
             onExport={onExport}
             onAddSample={onAddSample}
             base={base}

@@ -244,6 +244,22 @@ export async function removeListing(id) {
   }
 }
 
+// Strike / unstrike a listing: it stays in the Leads list but is flagged as not
+// being pursued, which removes it from Visitations and schedule generation.
+export async function strikeListing(id, struck) {
+  if (isRemote()) {
+    const { error } = await supabase.from('listings').update({ struck }).eq('id', id)
+    if (error) throw error
+    return
+  }
+  const rows = readLS(LS_LISTINGS)
+  const i = rows.findIndex((r) => r.id === id)
+  if (i > -1) {
+    rows[i] = { ...rows[i], struck }
+    writeLS(LS_LISTINGS, rows)
+  }
+}
+
 // Bring a trashed listing back.
 export async function restoreListing(id) {
   if (isRemote()) {
@@ -303,6 +319,27 @@ export async function createSchedule({ hunt_id, name, data }) {
   return row
 }
 
+export async function updateSchedule(id, patch) {
+  if (isRemote()) {
+    const { data, error } = await supabase
+      .from('schedules')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+  const rows = readLS(LS_SCHEDULES)
+  const i = rows.findIndex((s) => s.id === id)
+  if (i > -1) {
+    rows[i] = { ...rows[i], ...patch }
+    writeLS(LS_SCHEDULES, rows)
+    return rows[i]
+  }
+  return null
+}
+
 export async function removeSchedule(id) {
   if (isRemote()) {
     const { error } = await supabase.from('schedules').delete().eq('id', id)
@@ -317,7 +354,7 @@ export async function allListingsLite() {
   if (isRemote()) {
     const { data, error } = await supabase
       .from('listings')
-      .select('id,hunt_id,status,visit_confirmed')
+      .select('id,hunt_id,status,visit_confirmed,struck')
       .is('deleted_at', null)
     if (error) throw error
     return data || []
@@ -329,5 +366,6 @@ export async function allListingsLite() {
       hunt_id: l.hunt_id,
       status: l.status,
       visit_confirmed: l.visit_confirmed,
+      struck: l.struck,
     }))
 }

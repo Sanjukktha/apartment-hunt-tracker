@@ -15,6 +15,16 @@ function fmtDT(v) {
   })
 }
 
+// Formats a 'YYYY-MM-DD' planned-visit date without the UTC-parsing off-by-one
+// (new Date('2026-06-15') is midnight UTC, which can land on the 14th locally).
+export function fmtPlannedDate(v) {
+  if (!v) return ''
+  const [y, m, d] = v.split('-').map(Number)
+  if (!y || !m || !d) return v
+  const date = new Date(y, m - 1, d)
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 export function timingLabel(l) {
   if (l.visit_timing_type === 'flexible') {
     const s = l.visit_window_start ? fmtDT(l.visit_window_start) : null
@@ -28,7 +38,7 @@ export function timingLabel(l) {
   return 'Time not set yet'
 }
 
-export default function ScheduleGroups({ groups, base, startIndex = 0 }) {
+export default function ScheduleGroups({ groups, base, startIndex = 0, editable = false, onGroupDate }) {
   return (
     <div className="flex flex-col gap-4">
       {groups.map((g, gi) => (
@@ -38,7 +48,23 @@ export default function ScheduleGroups({ groups, base, startIndex = 0 }) {
               <h3 className="font-display m-0 text-[18px] font-semibold">
                 {startIndex + gi + 1}. {g.label}
               </h3>
-              {g.dates && g.dates.length > 0 && <div className="hint mt-0.5">{g.dates.join(', ')}</div>}
+              {editable ? (
+                <label className="mt-1.5 flex items-center gap-2 text-[13px] text-ink-soft">
+                  Visit date:
+                  <input
+                    type="date"
+                    className="input max-w-[180px] py-1"
+                    value={g.plannedDate || ''}
+                    onChange={(e) => onGroupDate && onGroupDate(gi, e.target.value)}
+                  />
+                </label>
+              ) : g.plannedDate ? (
+                <div className="mt-0.5 text-[13px] font-medium text-terra">
+                  📅 {fmtPlannedDate(g.plannedDate)}
+                </div>
+              ) : g.dates && g.dates.length > 0 ? (
+                <div className="hint mt-0.5">{g.dates.join(', ')}</div>
+              ) : null}
             </div>
             {g.mapsUrl && (
               <a className="link-chip no-underline" href={g.mapsUrl} target="_blank" rel="noopener">
@@ -79,6 +105,16 @@ export default function ScheduleGroups({ groups, base, startIndex = 0 }) {
                       Start: {s.name}
                     </a>
                     <div className="hint mt-0.5">{s.kindLabel} · public transit start</div>
+                    {s.fromHomeUrl && (
+                      <a
+                        href={s.fromHomeUrl}
+                        target="_blank"
+                        rel="noopener"
+                        className="link-chip mt-1 inline-block no-underline"
+                      >
+                        Transit directions from your place
+                      </a>
+                    )}
                   </div>
                 </li>
               ) : (
@@ -93,7 +129,27 @@ export default function ScheduleGroups({ groups, base, startIndex = 0 }) {
                     >
                       {s.listing.address || s.listing.location || 'Untitled'}
                     </a>
+                    {(s.listing.type || s.listing.rent) && (
+                      <div className="muted mt-0.5 text-[12.5px]">
+                        {[
+                          s.listing.type,
+                          s.listing.rent ? '$' + Number(s.listing.rent).toLocaleString() : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                    )}
+                    {(s.listing.contact_name || s.listing.contact_number) && (
+                      <div className="muted mt-0.5 text-[12.5px]">
+                        {[s.listing.contact_name, s.listing.contact_number].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                     <div className="hint mt-0.5">{timingLabel(s.listing)}</div>
+                    {s.listing.notes && (
+                      <div className="muted mt-1 line-clamp-3 max-w-[460px] text-[12.5px]">
+                        {s.listing.notes}
+                      </div>
+                    )}
                     {s.travelFromPrev && (
                       <div className="muted mt-0.5 text-[12.5px]">
                         about {s.travelFromPrev.miles} mi, {s.travelFromPrev.min} min walk from the

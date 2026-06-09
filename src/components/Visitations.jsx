@@ -31,6 +31,7 @@ function slimListing(l) {
     visit_window_end: l.visit_window_end,
     contact_name: l.contact_name,
     contact_number: l.contact_number,
+    notes: l.notes,
   }
 }
 
@@ -43,7 +44,9 @@ function serializeSchedule(result) {
     thresholdKm: result.thresholdKm,
     groupCount: result.groupCount,
     transitAnchored: result.transitAnchored,
+    origin: result.origin || null,
     groups: result.groups.map((g) => ({
+      plannedDate: g.plannedDate || undefined,
       id: g.id,
       label: g.label,
       area: g.area,
@@ -61,6 +64,7 @@ function serializeSchedule(result) {
               kindLabel: s.kindLabel,
               lat: s.lat,
               lng: s.lng,
+              fromHomeUrl: s.fromHomeUrl || null,
               travelFromPrev: s.travelFromPrev || null,
             }
           : { travelFromPrev: s.travelFromPrev || null, listing: slimListing(s.listing) },
@@ -70,12 +74,16 @@ function serializeSchedule(result) {
 }
 
 export default function Visitations({ listings, base, onSaveSchedule }) {
-  const confirmed = useMemo(() => listings.filter((l) => l.visit_confirmed), [listings])
+  const confirmed = useMemo(
+    () => listings.filter((l) => l.visit_confirmed && !l.struck),
+    [listings],
+  )
   const [groupMode, setGroupMode] = useState('radius')
   const [thresholdKm, setThresholdKm] = useState(2.4)
   const [groupCount, setGroupCount] = useState(3)
   const [walkMin, setWalkMin] = useState(20)
   const [transitAnchor, setTransitAnchor] = useState(true)
+  const [origin, setOrigin] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -101,6 +109,7 @@ export default function Visitations({ listings, base, onSaveSchedule }) {
         groupCount,
         walkMin,
         transitAnchor,
+        origin: origin.trim() || null,
         findTransitMany,
       })
       setResult({ ...sched, ungeocoded, missing })
@@ -140,6 +149,15 @@ export default function Visitations({ listings, base, onSaveSchedule }) {
       ) : (
         <>
           <div className="card mt-5 p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <label className="hint whitespace-nowrap">Starting from</label>
+              <input
+                className="input min-w-[240px] flex-1"
+                placeholder="Where you're staying (optional) - adds transit directions from here to each stop"
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="font-semibold">{confirmed.length} confirmed</span>
               <span className="flex-1" />
