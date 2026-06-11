@@ -260,6 +260,23 @@ export async function strikeListing(id, struck) {
   }
 }
 
+// Mark a listing as visited / not visited: a visual-only flag meaning "still
+// considering this, but I have (not) been to see it". It does not affect strike,
+// status, or schedule generation; it only tints the row in the Leads table.
+export async function setVisited(id, visited) {
+  if (isRemote()) {
+    const { error } = await supabase.from('listings').update({ visited }).eq('id', id)
+    if (error) throw error
+    return
+  }
+  const rows = readLS(LS_LISTINGS)
+  const i = rows.findIndex((r) => r.id === id)
+  if (i > -1) {
+    rows[i] = { ...rows[i], visited }
+    writeLS(LS_LISTINGS, rows)
+  }
+}
+
 // Bring a trashed listing back.
 export async function restoreListing(id) {
   if (isRemote()) {
@@ -354,7 +371,7 @@ export async function allListingsLite() {
   if (isRemote()) {
     const { data, error } = await supabase
       .from('listings')
-      .select('id,hunt_id,status,visit_confirmed,struck')
+      .select('id,hunt_id,status,visit_confirmed,struck,visited')
       .is('deleted_at', null)
     if (error) throw error
     return data || []
@@ -367,5 +384,6 @@ export async function allListingsLite() {
       status: l.status,
       visit_confirmed: l.visit_confirmed,
       struck: l.struck,
+      visited: l.visited,
     }))
 }

@@ -65,6 +65,7 @@ export default function ListingsTable({
   canEdit,
   onDelete,
   onStrike,
+  onVisited,
   onExport,
   onAddSample,
   base,
@@ -132,10 +133,10 @@ export default function ListingsTable({
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="w-full min-w-[1080px] border-collapse text-[13.5px]">
+        <table className="w-full min-w-[1100px] border-collapse text-[13.5px]">
           <thead>
             <tr>
-              {['Status', 'Address', 'Type', 'Rent', 'Location', 'Visit', 'Commute', 'Contact', 'Media', 'Rating', 'Notes', ''].map(
+              {['', 'Status', 'Address', 'Type', 'Rent', 'Location', 'Visit', 'Commute', 'Contact', 'Media', 'Rating', 'Notes', ''].map(
                 (h, i) => (
                   <th
                     key={i}
@@ -149,7 +150,15 @@ export default function ListingsTable({
           </thead>
           <tbody>
             {rows.map((l) => (
-              <Row key={l.id} l={l} canEdit={canEdit} onDelete={onDelete} onStrike={onStrike} base={base} />
+              <Row
+                key={l.id}
+                l={l}
+                canEdit={canEdit}
+                onDelete={onDelete}
+                onStrike={onStrike}
+                onVisited={onVisited}
+                base={base}
+              />
             ))}
           </tbody>
         </table>
@@ -169,18 +178,48 @@ export default function ListingsTable({
   )
 }
 
-function Row({ l, canEdit, onDelete, onStrike, base }) {
+function Row({ l, canEdit, onDelete, onStrike, onVisited, base }) {
   const go = () => navigate(`${base}/id=` + encodeURIComponent(l.id))
   const stop = (e) => e.stopPropagation()
   const commutes = Array.isArray(l.commutes) ? l.commutes.filter((c) => c.mapsUrl) : []
   const mediaCount = Array.isArray(l.media) ? l.media.length : 0
   const struck = !!l.struck
+  const visited = !!l.visited
+
+  // Struck leads are out of consideration, so they only dim. Everything still in
+  // play gets a soft wash: green once visited, amber while it is still to-visit.
+  const tint = struck
+    ? 'hover:bg-paper'
+    : visited
+      ? 'bg-[#eef6ee] hover:bg-[#e4f0e4]'
+      : 'bg-[#fdf6ea] hover:bg-[#fbefd8]'
 
   return (
-    <tr
-      className={`cursor-pointer align-top hover:bg-paper ${struck ? 'opacity-55' : ''}`}
-      onClick={go}
-    >
+    <tr className={`cursor-pointer align-top ${tint} ${struck ? 'opacity-55' : ''}`} onClick={go}>
+      <td className="border-b border-line px-3 py-3 text-center" onClick={stop}>
+        {canEdit ? (
+          <button
+            onClick={() => onVisited(l)}
+            title={
+              visited
+                ? 'Visited - click to mark as still to-visit'
+                : 'Still to visit - click to mark as visited'
+            }
+            className="grid h-[26px] w-[26px] place-items-center rounded-full border text-[14px] leading-none"
+            style={
+              visited
+                ? { borderColor: '#2e7d32', background: '#d6efd6', color: '#2e7d32' }
+                : { borderColor: '#e2c690', background: '#fde9c8', color: '#9a6b00' }
+            }
+          >
+            {visited ? '✓' : ''}
+          </button>
+        ) : visited ? (
+          <span style={{ color: '#2e7d32' }}>✓</span>
+        ) : (
+          <span className="muted">○</span>
+        )}
+      </td>
       <td className="border-b border-line px-3 py-3">
         <StatusPill status={l.status} />
       </td>

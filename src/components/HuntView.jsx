@@ -26,6 +26,7 @@ export default function HuntView({
   onSaveListing,
   onDeleteListing,
   onStrikeListing,
+  onVisitedListing,
   onRestoreListing,
   onPurgeListing,
   onAddSample,
@@ -177,6 +178,7 @@ export default function HuntView({
             canEdit={canEdit}
             onDelete={onDeleteListing}
             onStrike={onStrikeListing}
+            onVisited={onVisitedListing}
             onExport={onExport}
             onAddSample={onAddSample}
             base={base}

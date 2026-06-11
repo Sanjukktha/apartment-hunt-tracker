@@ -14,6 +14,7 @@ import {
   upsertListing,
   removeListing,
   strikeListing,
+  setVisited,
   restoreListing,
   purgeListing,
   listMembers,
@@ -221,6 +222,19 @@ export default function App() {
       if (!currentHunt) return
       try {
         await strikeListing(l.id, !l.struck)
+        await Promise.all([loadHuntData(currentHunt.id), loadHunts()])
+      } catch (e) {
+        setError(e.message || 'Could not update the listing')
+      }
+    },
+    [currentHunt, loadHuntData, loadHunts],
+  )
+
+  const handleVisitedListing = useCallback(
+    async (l) => {
+      if (!currentHunt) return
+      try {
+        await setVisited(l.id, !l.visited)
         await Promise.all([loadHuntData(currentHunt.id), loadHunts()])
       } catch (e) {
         setError(e.message || 'Could not update the listing')
@@ -477,6 +491,7 @@ export default function App() {
             onSaveListing={handleSaveListing}
             onDeleteListing={handleDeleteListing}
             onStrikeListing={handleStrikeListing}
+            onVisitedListing={handleVisitedListing}
             onRestoreListing={handleRestoreListing}
             onPurgeListing={handlePurgeListing}
             onAddSample={handleAddSample}
